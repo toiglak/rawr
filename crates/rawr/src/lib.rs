@@ -1,4 +1,8 @@
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 
 pub mod schema;
@@ -47,7 +51,7 @@ impl Codegen {
 
     pub fn run(self) {
         // Clear the output directory. If it didn't exist yet, ignore the error.
-        let _ = std::fs::remove_dir_all(&self.output_path);
+        let _ = fs::remove_dir_all(&self.output_path);
 
         // Group schemas by module
         let mut modules: HashMap<&'static str, Vec<SchemaDef>> = HashMap::new();
@@ -72,13 +76,12 @@ impl Codegen {
         let (imports, body) = self.generate_imports_and_body(module_path, schema_defs);
 
         let final_output = format!("{}{}", imports, body);
-        std::fs::write(&output_file_path, final_output).expect("Failed to write module bindings");
+        fs::write(&output_file_path, final_output).expect("Failed to write module bindings");
     }
 
-    fn create_module_directory(&self, module_path: &str) -> std::path::PathBuf {
-        let module_dir =
-            std::path::Path::new(&self.output_path).join(module_path.replace("::", "/"));
-        std::fs::create_dir_all(&module_dir).expect("Failed to create module directory");
+    fn create_module_directory(&self, module_path: &str) -> PathBuf {
+        let module_dir = Path::new(&self.output_path).join(module_path.replace("::", "/"));
+        fs::create_dir_all(&module_dir).expect("Failed to create module directory");
         module_dir
     }
 
@@ -89,7 +92,7 @@ impl Codegen {
     ) -> (String, String) {
         let mut imports = String::new();
         let mut body = String::new();
-        let mut visited_modules = std::collections::HashSet::new();
+        let mut visited_modules = HashSet::new();
 
         for schema_def in schema_defs {
             match schema_def {
@@ -114,7 +117,7 @@ impl Codegen {
         module_path: &str,
         struct_def: &StructDef,
         imports: &mut String,
-        visited_modules: &mut std::collections::HashSet<&str>,
+        visited_modules: &mut HashSet<&str>,
     ) {
         // Identify types from foreign modules and generate import statements
         for field in struct_def.fields {
