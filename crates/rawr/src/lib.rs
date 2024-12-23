@@ -1,6 +1,9 @@
-pub use linkme::*;
-use std::{any::TypeId, collections::HashMap};
+use std::collections::HashMap;
 use thiserror::Error;
+
+pub mod schema;
+
+pub use schema::*;
 
 /////////// Services /////////////
 
@@ -14,86 +17,6 @@ pub enum TransportError {
     ReceiveError,
     #[error("Connection closed")]
     Closed,
-}
-
-/////////// Schemas /////////////
-
-#[distributed_slice]
-pub static SCHEMA_REGISTRY: [fn() -> SchemaDef];
-
-#[derive(Debug, Clone)]
-pub struct TypeSchema {
-    pub name: String,
-    pub module_path: String,
-    pub crate_name: String,
-    pub definition: &'static SchemaDef,
-    pub dependencies: Vec<Dependency>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Dependency {
-    pub type_id: TypeId,
-    pub name: String,
-    pub module_path: String,
-    pub crate_name: String,
-}
-
-#[derive(Debug, Clone)]
-pub enum SchemaDef {
-    Primitive(PrimitiveType),
-    Struct(StructDef),
-}
-
-pub trait Schema {
-    fn schema() -> SchemaDef;
-}
-
-impl Schema for String {
-    fn schema() -> SchemaDef {
-        SchemaDef::Primitive(PrimitiveType::String)
-    }
-}
-
-impl Schema for i32 {
-    fn schema() -> SchemaDef {
-        SchemaDef::Primitive(PrimitiveType::I32)
-    }
-}
-
-impl Schema for bool {
-    fn schema() -> SchemaDef {
-        SchemaDef::Primitive(PrimitiveType::Bool)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum PrimitiveType {
-    U8,
-    U16,
-    U32,
-    U64,
-    I8,
-    I16,
-    I32,
-    I64,
-    F32,
-    F64,
-    Bool,
-    Char,
-    String,
-}
-
-#[derive(Debug, Clone)]
-pub struct StructDef {
-    pub name: &'static str,
-    pub module_path: &'static str,
-    pub fields: Vec<FieldDef>,
-}
-
-#[derive(Debug, Clone)]
-pub struct FieldDef {
-    pub name: &'static str,
-    pub schema: fn() -> SchemaDef,
 }
 
 /////////// Code Generation /////////////
@@ -121,8 +44,7 @@ impl Codegen {
     }
 
     pub fn run(self) {
-        // Clear the output directory
-        // Ignore error if the path didn't exist.
+        // Clear the output directory. If it didn't exist yet, ignore the error.
         let _ = std::fs::remove_dir_all(&self.output_path);
 
         // Group schemas by module
