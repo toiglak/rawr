@@ -11,7 +11,7 @@ impl Schema for ImportedStruct {
         SchemaDef::Struct(StructDef {
             name: "ImportedStruct",
             module_path: ::core::module_path!(),
-            fields: vec![FieldDef {
+            fields: &[FieldDef {
                 name: "value",
                 schema: <String as Schema>::schema,
             }],

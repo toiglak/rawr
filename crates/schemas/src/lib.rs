@@ -25,7 +25,7 @@ impl Schema for MyData {
         SchemaDef::Struct(StructDef {
             name: "MyData",
             module_path: ::core::module_path!(),
-            fields: vec![
+            fields: &[
                 FieldDef {
                     name: "name",
                     schema: <String as Schema>::schema,

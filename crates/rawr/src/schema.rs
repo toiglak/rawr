@@ -33,13 +33,13 @@ impl_schema_for_primitive!(
   char => Char
 );
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum SchemaDef {
     Primitive(PrimitiveType),
     Struct(StructDef),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PrimitiveType {
     U8,
     U16,
@@ -56,14 +56,14 @@ pub enum PrimitiveType {
     String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct StructDef {
     pub name: &'static str,
     pub module_path: &'static str,
-    pub fields: Vec<FieldDef>,
+    pub fields: &'static [FieldDef],
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct FieldDef {
     pub name: &'static str,
     pub schema: fn() -> SchemaDef,

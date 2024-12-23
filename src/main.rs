@@ -13,7 +13,7 @@ impl Schema for MainStruct {
         SchemaDef::Struct(StructDef {
             name: "MainStruct",
             module_path: ::core::module_path!(),
-            fields: vec![
+            fields: &[
                 FieldDef {
                     name: "a",
                     schema: <i32 as Schema>::schema,

@@ -85,7 +85,7 @@ impl Codegen {
         for schema_def in schema_defs {
             if let SchemaDef::Struct(struct_def) = schema_def {
                 // Identify types from foreign modules and generate import statements
-                for field in &struct_def.fields {
+                for field in struct_def.fields {
                     // TODO: This can be abstracted, since all Schema (enum,
                     // struct) have a module_path.
                     if let SchemaDef::Struct(struct_def) = (field.schema)() {
@@ -106,7 +106,7 @@ impl Codegen {
 
                 // Generate type definition for the struct
                 body.push_str(&format!("export type {} = {{\n", struct_def.name));
-                for field in &struct_def.fields {
+                for field in struct_def.fields {
                     // Map Rust type to TypeScript type
                     let ts_type = match (field.schema)() {
                         SchemaDef::Primitive(ref prim) => self.map_primitive_to_typescript(prim),
