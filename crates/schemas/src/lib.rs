@@ -1,4 +1,7 @@
-use rawr::{distributed_slice, FieldDef, Schema, SchemaDef, StructDef};
+use module::ImportedStruct;
+use rawr::{FieldDef, Schema, SchemaDef, StructDef};
+
+pub mod module;
 
 pub fn import() {
     // Dummy function to force the compiler to include static variables from this
@@ -14,6 +17,7 @@ pub struct MyData {
     pub name: String,
     pub count: i32,
     pub is_active: bool,
+    pub imported: ImportedStruct,
 }
 
 impl Schema for MyData {
@@ -33,12 +37,16 @@ impl Schema for MyData {
                     name: "is_active",
                     schema: <bool as Schema>::schema(),
                 },
+                FieldDef {
+                    name: "imported",
+                    schema: <ImportedStruct as Schema>::schema(),
+                },
             ],
         })
     }
 }
 
 const _: () = {
-    #[distributed_slice(rawr::SCHEMA_REGISTRY)]
-    static MY_DATA_SCHEMA_DEF: fn() -> SchemaDef = <MyData as Schema>::schema;
+    #[linkme::distributed_slice(rawr::SCHEMA_REGISTRY)]
+    static __: fn() -> SchemaDef = <MyData as Schema>::schema;
 };

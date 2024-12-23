@@ -120,6 +120,9 @@ impl Codegen {
     }
 
     pub fn run(self) {
+        // Clear the output directory
+        std::fs::remove_dir_all(&self.output_path).expect("Failed to remove output directory");
+
         let mut generated_types = std::collections::HashSet::new();
 
         for schema_fn in SCHEMA_REGISTRY {
