@@ -83,39 +83,63 @@ impl Codegen {
 
         // Go over every exported schema in the given module.
         for schema_def in schema_defs {
-            if let SchemaDef::Struct(struct_def) = schema_def {
-                // Identify types from foreign modules and generate import statements
-                for field in struct_def.fields {
-                    // TODO: This can be abstracted, since all Schema (enum,
-                    // struct) have a module_path.
-                    if let SchemaDef::Struct(struct_def) = (field.schema)() {
-                        let struct_path = struct_def.module_path;
-                        // If the field's module is different from the currently
-                        // generated module and it hasn't been visited yet,
-                        // generate an import statement.
-                        if struct_path != module_path && !visited_modules.contains(struct_path) {
-                            visited_modules.insert(struct_path);
-                            let import_path = self.compute_import_path(module_path, struct_path);
-                            imports.push_str(&format!(
-                                "import {{ {} }} from '{}';\n",
-                                struct_def.name, import_path
-                            ));
+            // TODO: This can be abstracted as StructDef::generate or something and
+            // for each variant accordingly.
+            match schema_def {
+                SchemaDef::Struct(struct_def) => {
+                    // Identify types from foreign modules and generate import statements
+                    for field in struct_def.fields {
+                        // TODO: This can be abstracted, since all Schema (enum,
+                        // struct) have a module_path.
+                        if let SchemaDef::Struct(struct_def) = (field.schema)() {
+                            let struct_path = struct_def.module_path;
+                            // If the field's module is different from the currently
+                            // generated module and it hasn't been visited yet,
+                            // generate an import statement.
+                            if struct_path != module_path && !visited_modules.contains(struct_path)
+                            {
+                                visited_modules.insert(struct_path);
+                                let import_path =
+                                    self.compute_import_path(module_path, struct_path);
+                                imports.push_str(&format!(
+                                    "import {{ {} }} from '{}';\n",
+                                    struct_def.name, import_path
+                                ));
+                            }
                         }
                     }
-                }
 
-                // Generate type definition for the struct
-                body.push_str(&format!("export type {} = {{\n", struct_def.name));
-                for field in struct_def.fields {
-                    // Map Rust type to TypeScript type
-                    let ts_type = match (field.schema)() {
-                        SchemaDef::Primitive(ref prim) => self.map_primitive_to_typescript(prim),
-                        SchemaDef::Struct(ref struct_type) => struct_type.name.to_string(),
-                    };
-                    // Add field definition to the type
-                    body.push_str(&format!("  {}: {};\n", field.name, ts_type));
+                    // Generate type definition for the struct
+                    body.push_str(&format!("export type {} = {{\n", struct_def.name));
+                    for field in struct_def.fields {
+                        // Map Rust type to TypeScript type
+                        let ts_type = match (field.schema)() {
+                            SchemaDef::Primitive(ref prim) => {
+                                self.map_primitive_to_typescript(prim)
+                            }
+                            SchemaDef::Struct(ref struct_type) => struct_type.name.to_string(),
+                            SchemaDef::Tuple(ref tuple_schemas) => {
+                                let ts_types: Vec<String> = tuple_schemas
+                                    .iter()
+                                    .map(|schema_fn| match schema_fn() {
+                                        SchemaDef::Primitive(ref prim) => {
+                                            self.map_primitive_to_typescript(prim)
+                                        }
+                                        SchemaDef::Struct(ref struct_type) => {
+                                            struct_type.name.to_string()
+                                        }
+                                        _ => "any".to_string(),
+                                    })
+                                    .collect();
+                                format!("[{}]", ts_types.join(", "))
+                            }
+                        };
+                        // Add field definition to the type
+                        body.push_str(&format!("  {}: {};\n", field.name, ts_type));
+                    }
+                    body.push_str("};\n");
                 }
-                body.push_str("};\n");
+                _ => {}
             }
         }
 
