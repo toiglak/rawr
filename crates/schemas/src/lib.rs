@@ -1,13 +1,11 @@
 use rawr::{distributed_slice, FieldDef, Schema, SchemaDef, StructDef};
 
 pub fn import() {
-    // Dummy function to force the compiler to include the static variables from
-    // this crate in the binary, thus allowing the types marked for export to be
+    // Dummy function to force the compiler to include static variables from this
+    // crate in the final binary, thus allowing the types marked for export to be
     // registered.
 
-    // NOTE: It seems like this function gets optimized out when running in release
-    // mode, thus statics in this crate are not included in the final binary.
-    //
+    // It seems like this function gets optimized out when running in release mode.
     // This fixes that problem.
     std::hint::black_box(());
 }

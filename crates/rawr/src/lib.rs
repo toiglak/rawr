@@ -131,18 +131,16 @@ impl Codegen {
     fn generate_bindings(
         &self,
         schema_def: &SchemaDef,
-        generated_types: &mut std::collections::HashSet<String>,
+        generated_types: &mut std::collections::HashSet<&'static str>,
     ) {
         match schema_def {
             SchemaDef::Struct(struct_def) => {
-                // Assuming the struct name can be derived from the SchemaDef for now
-                // This will be more robust with the actual macro output
-                let struct_name = "MyData".to_string();
+                let struct_name = struct_def.name;
 
-                if generated_types.contains(&struct_name) {
+                if generated_types.contains(struct_name) {
                     return;
                 }
-                generated_types.insert(struct_name.clone());
+                generated_types.insert(struct_name);
 
                 let output_file_path =
                     format!("{}/{}.ts", self.output_path, struct_name.to_lowercase());
