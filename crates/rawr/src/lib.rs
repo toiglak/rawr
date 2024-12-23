@@ -1,17 +1,25 @@
 pub use linkme::*;
 use std::any::TypeId;
+use thiserror::Error;
+
+///////////// Services /////////////
 
 pub type Result<T> = std::result::Result<T, TransportError>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Error)]
 pub enum TransportError {
+    #[error("Failed to send data")]
     SendError,
+    #[error("Failed to receive data")]
     ReceiveError,
+    #[error("Connection closed")]
     Closed,
 }
 
+///////////// Schemas /////////////
+
 #[distributed_slice]
-pub static REGISTRY: [fn() -> SchemaDef];
+pub static SCHEMA_REGISTRY: [fn() -> SchemaDef];
 
 #[derive(Debug, Clone)]
 pub struct TypeSchema {
@@ -30,32 +38,29 @@ pub struct Dependency {
     pub crate_name: String,
 }
 
-/// Defines the structure of a type.
 #[derive(Debug, Clone)]
 pub enum SchemaDef {
     Primitive(PrimitiveType),
     Struct(StructDef),
 }
 
-/// Trait for types that have a schema definition.
-pub trait HasSchema {
+pub trait Schema {
     fn schema() -> SchemaDef;
 }
 
-// Implement HasSchema for primitive types
-impl HasSchema for String {
+impl Schema for String {
     fn schema() -> SchemaDef {
         SchemaDef::Primitive(PrimitiveType::String)
     }
 }
 
-impl HasSchema for i32 {
+impl Schema for i32 {
     fn schema() -> SchemaDef {
         SchemaDef::Primitive(PrimitiveType::I32)
     }
 }
 
-impl HasSchema for bool {
+impl Schema for bool {
     fn schema() -> SchemaDef {
         SchemaDef::Primitive(PrimitiveType::Bool)
     }
@@ -80,16 +85,17 @@ pub enum PrimitiveType {
 
 #[derive(Debug, Clone)]
 pub struct StructDef {
+    pub name: &'static str,
     pub fields: Vec<FieldDef>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FieldDef {
-    pub name: String,
+    pub name: &'static str,
     pub schema: SchemaDef,
 }
 
-// --- Code Generation ---
+///////////// Code Generation /////////////
 
 pub struct Codegen {
     output_path: String,
@@ -109,14 +115,14 @@ impl Codegen {
 
     pub fn debug(self) -> Self {
         println!("Output path: {:?}", self.output_path);
-        println!("Registry length: {:?}", REGISTRY.len());
+        println!("Registry length: {:?}", SCHEMA_REGISTRY.len());
         self
     }
 
     pub fn run(self) {
         let mut generated_types = std::collections::HashSet::new();
 
-        for schema_fn in REGISTRY {
+        for schema_fn in SCHEMA_REGISTRY {
             let schema_def = schema_fn();
             self.generate_bindings(&schema_def, &mut generated_types);
         }
@@ -147,6 +153,8 @@ impl Codegen {
                     output.push_str(&format!("  {}: {};\n", field.name, ts_type));
                 }
                 output.push_str("};\n");
+                std::fs::create_dir_all(&self.output_path)
+                    .expect("Failed to create output directory");
                 std::fs::write(&output_file_path, output).expect("Failed to write output file");
                 println!(
                     "Generated bindings for {} at {:?}",
