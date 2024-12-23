@@ -1,5 +1,5 @@
 pub use linkme::*;
-use std::{any::TypeId, collections::HashMap, path::Path};
+use std::{any::TypeId, collections::HashMap};
 use thiserror::Error;
 
 /////////// Services /////////////
@@ -120,42 +120,10 @@ impl Codegen {
         self
     }
 
-    fn visit_schemas(&self) -> HashMap<&'static str, &'static str> {
-        let mut type_map = HashMap::new();
-
-        for schema_fn in SCHEMA_REGISTRY {
-            let schema_def = schema_fn();
-            self.collect_types(&schema_def, &mut type_map);
-        }
-
-        type_map
-    }
-
-    fn collect_types(
-        &self,
-        schema_def: &SchemaDef,
-        type_map: &mut HashMap<&'static str, &'static str>,
-    ) {
-        match schema_def {
-            SchemaDef::Struct(struct_def) => {
-                type_map.insert(struct_def.name, struct_def.module_path);
-                for field in &struct_def.fields {
-                    let field_schema = (field.schema)();
-                    self.collect_types(&field_schema, type_map);
-                }
-            }
-            SchemaDef::Primitive(_) => {
-                // Primitives don't need to be collected
-            }
-        }
-    }
-
     pub fn run(self) {
         // Clear the output directory
         // Ignore error if the path didn't exist.
         let _ = std::fs::remove_dir_all(&self.output_path);
-
-        let type_map = self.visit_schemas();
 
         // Group schemas by module
         let mut modules: HashMap<&'static str, Vec<SchemaDef>> = HashMap::new();
@@ -170,16 +138,11 @@ impl Codegen {
         }
 
         for (module_path, schema_defs) in modules {
-            self.generate_module_bindings(module_path, &schema_defs, &type_map);
+            self.generate_module_bindings(module_path, &schema_defs);
         }
     }
 
-    fn generate_module_bindings(
-        &self,
-        module_path: &'static str,
-        schema_defs: &[SchemaDef],
-        type_map: &HashMap<&'static str, &'static str>,
-    ) {
+    fn generate_module_bindings(&self, module_path: &'static str, schema_defs: &[SchemaDef]) {
         let module_dir =
             std::path::Path::new(&self.output_path).join(module_path.replace("::", "/"));
         std::fs::create_dir_all(&module_dir).expect("Failed to create module directory");
@@ -197,10 +160,11 @@ impl Codegen {
                         let field_mod = field_struct_def.module_path;
                         if field_mod != module_path && !visited_modules.contains(field_mod) {
                             visited_modules.insert(field_mod);
-                            let import_path = if field_mod == "" {
-                                "./".to_string()
+                            let import_path = if field_mod.starts_with(module_path) {
+                                let relative_path = field_mod.strip_prefix(module_path).unwrap();
+                                format!(".{}", relative_path.replace("::", "/"))
                             } else {
-                                format!("./{}", field_mod.replace("::", "/"))
+                                format!("../{}", field_mod.replace("::", "/"))
                             };
                             imports.push_str(&format!(
                                 "import {{ {} }} from '{}';\n",

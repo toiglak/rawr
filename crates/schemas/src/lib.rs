@@ -22,10 +22,9 @@ pub struct MyData {
 
 impl Schema for MyData {
     fn schema() -> SchemaDef {
-        println!("module path for MyData: {}", module_path!());
         SchemaDef::Struct(StructDef {
             name: "MyData",
-            module_path: "",
+            module_path: ::core::module_path!(),
             fields: vec![
                 FieldDef {
                     name: "name",
