@@ -6,5 +6,5 @@ fn main() {
 
     rawr::Codegen::new().export_to("bindings").debug().run();
 
-    println!("Bindings generated to bindings/mydata.ts");
+    println!("Bindings generation complete!");
 }

@@ -1,7 +1,7 @@
 use rawr::{FieldDef, Schema, SchemaDef, StructDef};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportedStruct {
     pub value: String,
 }
@@ -9,10 +9,11 @@ pub struct ImportedStruct {
 impl Schema for ImportedStruct {
     fn schema() -> SchemaDef {
         SchemaDef::Struct(StructDef {
-            name: "FieldDefinition",
+            name: "ImportedStruct",
+            module_path: "module",
             fields: vec![FieldDef {
                 name: "value",
-                schema: <String as Schema>::schema(),
+                schema: <String as Schema>::schema,
             }],
         })
     }

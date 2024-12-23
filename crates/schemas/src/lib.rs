@@ -22,24 +22,26 @@ pub struct MyData {
 
 impl Schema for MyData {
     fn schema() -> SchemaDef {
+        println!("module path for MyData: {}", module_path!());
         SchemaDef::Struct(StructDef {
             name: "MyData",
+            module_path: "",
             fields: vec![
                 FieldDef {
                     name: "name",
-                    schema: <String as Schema>::schema(),
+                    schema: <String as Schema>::schema,
                 },
                 FieldDef {
                     name: "count",
-                    schema: <i32 as Schema>::schema(),
+                    schema: <i32 as Schema>::schema,
                 },
                 FieldDef {
                     name: "is_active",
-                    schema: <bool as Schema>::schema(),
+                    schema: <bool as Schema>::schema,
                 },
                 FieldDef {
                     name: "imported",
-                    schema: <ImportedStruct as Schema>::schema(),
+                    schema: <ImportedStruct as Schema>::schema,
                 },
             ],
         })

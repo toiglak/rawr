@@ -1,8 +1,8 @@
 pub use linkme::*;
-use std::any::TypeId;
+use std::{any::TypeId, collections::HashMap, path::Path};
 use thiserror::Error;
 
-///////////// Services /////////////
+/////////// Services /////////////
 
 pub type Result<T> = std::result::Result<T, TransportError>;
 
@@ -16,7 +16,7 @@ pub enum TransportError {
     Closed,
 }
 
-///////////// Schemas /////////////
+/////////// Schemas /////////////
 
 #[distributed_slice]
 pub static SCHEMA_REGISTRY: [fn() -> SchemaDef];
@@ -86,16 +86,17 @@ pub enum PrimitiveType {
 #[derive(Debug, Clone)]
 pub struct StructDef {
     pub name: &'static str,
+    pub module_path: &'static str,
     pub fields: Vec<FieldDef>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FieldDef {
     pub name: &'static str,
-    pub schema: SchemaDef,
+    pub schema: fn() -> SchemaDef,
 }
 
-///////////// Code Generation /////////////
+/////////// Code Generation /////////////
 
 pub struct Codegen {
     output_path: String,
@@ -119,69 +120,123 @@ impl Codegen {
         self
     }
 
-    pub fn run(self) {
-        // Clear the output directory
-        std::fs::remove_dir_all(&self.output_path).expect("Failed to remove output directory");
-
-        let mut generated_types = std::collections::HashSet::new();
+    fn visit_schemas(&self) -> HashMap<&'static str, &'static str> {
+        let mut type_map = HashMap::new();
 
         for schema_fn in SCHEMA_REGISTRY {
             let schema_def = schema_fn();
-            self.generate_bindings(&schema_def, &mut generated_types);
+            self.collect_types(&schema_def, &mut type_map);
         }
+
+        type_map
     }
 
-    fn generate_bindings(
+    fn collect_types(
         &self,
         schema_def: &SchemaDef,
-        generated_types: &mut std::collections::HashSet<&'static str>,
+        type_map: &mut HashMap<&'static str, &'static str>,
     ) {
         match schema_def {
             SchemaDef::Struct(struct_def) => {
-                let struct_name = struct_def.name;
-
-                if generated_types.contains(struct_name) {
-                    return;
-                }
-                generated_types.insert(struct_name);
-
-                let output_file_path =
-                    format!("{}/{}.ts", self.output_path, struct_name.to_lowercase());
-                let mut output = String::new();
-                output.push_str(&format!("export type {} = {{\n", struct_name));
+                type_map.insert(struct_def.name, struct_def.module_path);
                 for field in &struct_def.fields {
-                    let ts_type = self.map_schema_def_to_typescript(&field.schema);
-                    output.push_str(&format!("  {}: {};\n", field.name, ts_type));
+                    let field_schema = (field.schema)();
+                    self.collect_types(&field_schema, type_map);
                 }
-                output.push_str("};\n");
-                std::fs::create_dir_all(&self.output_path)
-                    .expect("Failed to create output directory");
-                std::fs::write(&output_file_path, output).expect("Failed to write output file");
-                println!(
-                    "Generated bindings for {} at {:?}",
-                    struct_name, output_file_path
-                );
             }
             SchemaDef::Primitive(_) => {
-                // Primitives don't generate standalone files
+                // Primitives don't need to be collected
             }
         }
     }
 
-    fn map_schema_def_to_typescript(&self, schema_def: &SchemaDef) -> String {
-        match schema_def {
-            SchemaDef::Primitive(primitive) => match primitive {
-                PrimitiveType::String => "string".to_string(),
-                PrimitiveType::I32
-                | PrimitiveType::I64
-                | PrimitiveType::U32
-                | PrimitiveType::U64
-                | PrimitiveType::F32
-                | PrimitiveType::F64 => "number".to_string(),
-                PrimitiveType::Bool => "boolean".to_string(),
-                _ => "any".to_string(), // Add more primitive type mappings as needed
-            },
-            SchemaDef::Struct(_) => "any".to_string(), // Will be replaced by the actual type name
+    pub fn run(self) {
+        // Clear the output directory
+        // Ignore error if the path didn't exist.
+        let _ = std::fs::remove_dir_all(&self.output_path);
+
+        let type_map = self.visit_schemas();
+
+        // Group schemas by module
+        let mut modules: HashMap<&'static str, Vec<SchemaDef>> = HashMap::new();
+        for schema_fn in SCHEMA_REGISTRY {
+            let schema_def = schema_fn();
+            if let SchemaDef::Struct(struct_def) = &schema_def {
+                modules
+                    .entry(struct_def.module_path)
+                    .or_insert_with(Vec::new)
+                    .push(schema_def.clone());
+            }
+        }
+
+        for (module_path, schema_defs) in modules {
+            self.generate_module_bindings(module_path, &schema_defs, &type_map);
+        }
+    }
+
+    fn generate_module_bindings(
+        &self,
+        module_path: &'static str,
+        schema_defs: &[SchemaDef],
+        type_map: &HashMap<&'static str, &'static str>,
+    ) {
+        let module_dir =
+            std::path::Path::new(&self.output_path).join(module_path.replace("::", "/"));
+        std::fs::create_dir_all(&module_dir).expect("Failed to create module directory");
+        let output_file_path = module_dir.join("index.ts");
+
+        let mut imports = String::new();
+        let mut body = String::new();
+        let mut visited_modules = std::collections::HashSet::new();
+
+        for schema_def in schema_defs {
+            if let SchemaDef::Struct(struct_def) = schema_def {
+                // Collect cross-module references
+                for field in &struct_def.fields {
+                    if let SchemaDef::Struct(field_struct_def) = (field.schema)() {
+                        let field_mod = field_struct_def.module_path;
+                        if field_mod != module_path && !visited_modules.contains(field_mod) {
+                            visited_modules.insert(field_mod);
+                            let import_path = if field_mod == "" {
+                                "./".to_string()
+                            } else {
+                                format!("./{}", field_mod.replace("::", "/"))
+                            };
+                            imports.push_str(&format!(
+                                "import {{ {} }} from '{}';\n",
+                                field_struct_def.name, import_path
+                            ));
+                        }
+                    }
+                }
+                // Generate type definition
+                body.push_str(&format!("export type {} = {{\n", struct_def.name));
+                for field in &struct_def.fields {
+                    let ts_type = match (field.schema)() {
+                        SchemaDef::Primitive(ref prim) => self.map_primitive_to_typescript(prim),
+                        SchemaDef::Struct(ref struct_type) => struct_type.name.to_string(),
+                    };
+                    body.push_str(&format!("  {}: {};\n", field.name, ts_type));
+                }
+                body.push_str("};\n");
+            }
+        }
+
+        let final_output = format!("{}{}", imports, body);
+        std::fs::write(&output_file_path, final_output).expect("Failed to write module bindings");
+    }
+
+    fn map_primitive_to_typescript(&self, primitive: &PrimitiveType) -> String {
+        match primitive {
+            PrimitiveType::String => "string".to_string(),
+            PrimitiveType::I32
+            | PrimitiveType::I64
+            | PrimitiveType::U32
+            | PrimitiveType::U64
+            | PrimitiveType::F32
+            | PrimitiveType::F64 => "number".to_string(),
+            PrimitiveType::Bool => "boolean".to_string(),
+            _ => "any".to_string(),
         }
     }
 }
