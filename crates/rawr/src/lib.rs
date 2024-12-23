@@ -120,17 +120,17 @@ impl Codegen {
         for field in struct_def.fields {
             // TODO: This can be abstracted, since almost all
             // Schema-s (enum, struct) have a module_path.
-            if let SchemaDef::Struct(field_struct_def) = (field.schema)() {
+            if let SchemaDef::Struct(struct_def) = (field.schema)() {
                 // If the field's module is different from the currently generated
                 // module and it hasn't been visited yet, generate an import
                 // statement.
-                let struct_path = field_struct_def.module_path;
+                let struct_path = struct_def.module_path;
                 if struct_path != module_path && !visited_modules.contains(struct_path) {
                     visited_modules.insert(struct_path);
                     let import_path = self.compute_import_path(module_path, struct_path);
                     imports.push_str(&format!(
                         "import {{ {} }} from '{}';\n",
-                        field_struct_def.name, import_path
+                        struct_def.name, import_path
                     ));
                 }
             }
@@ -140,27 +140,27 @@ impl Codegen {
     fn generate_struct_body(&self, struct_def: &StructDef, body: &mut String) {
         body.push_str(&format!("export type {} = {{\n", struct_def.name));
         for field in struct_def.fields {
-            let ts_type = self.map_schema_to_typescript(&field.schema);
+            let ts_type = self.map_schema_to_type(&field.schema);
             body.push_str(&format!("  {}: {};\n", field.name, ts_type));
         }
         body.push_str("};\n");
     }
 
-    fn map_schema_to_typescript(&self, schema: &SchemaFn) -> String {
+    fn map_schema_to_type(&self, schema: &SchemaFn) -> String {
         match schema() {
-            SchemaDef::Primitive(ref prim) => self.map_primitive_to_typescript(prim),
+            SchemaDef::Primitive(ref prim) => self.map_primitive_to_type(prim),
             SchemaDef::Struct(ref struct_type) => struct_type.name.to_string(),
             SchemaDef::Tuple(ref tuple_schemas) => {
                 let ts_types: Vec<String> = tuple_schemas
                     .iter()
-                    .map(|schema| self.map_schema_to_typescript(schema))
+                    .map(|schema| self.map_schema_to_type(schema))
                     .collect();
                 format!("[{}]", ts_types.join(", "))
             }
         }
     }
 
-    fn map_primitive_to_typescript(&self, primitive: &PrimitiveType) -> String {
+    fn map_primitive_to_type(&self, primitive: &PrimitiveType) -> String {
         match primitive {
             PrimitiveType::String => "string".to_string(),
             PrimitiveType::I32
