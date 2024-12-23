@@ -162,15 +162,19 @@ impl Codegen {
 
     fn map_primitive_to_type(&self, primitive: &PrimitiveType) -> String {
         match primitive {
-            PrimitiveType::String => "string".to_string(),
-            PrimitiveType::I32
-            | PrimitiveType::I64
+            PrimitiveType::U8
+            | PrimitiveType::U16
             | PrimitiveType::U32
             | PrimitiveType::U64
+            | PrimitiveType::I8
+            | PrimitiveType::I16
+            | PrimitiveType::I32
+            | PrimitiveType::I64
             | PrimitiveType::F32
             | PrimitiveType::F64 => "number".to_string(),
             PrimitiveType::Bool => "boolean".to_string(),
-            _ => "any".to_string(),
+            PrimitiveType::Char => "string".to_string(),
+            PrimitiveType::String => "string".to_string(),
         }
     }
 

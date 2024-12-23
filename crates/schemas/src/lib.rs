@@ -18,7 +18,8 @@ pub struct MyData {
     pub count: i32,
     pub is_active: bool,
     pub imported: ImportedStruct,
-    pub tuple_field: (i32, ImportedStruct),
+    pub tuple: (char, ImportedStruct),
+    pub nested_tuple: (char, (i32, ImportedStruct)),
 }
 
 impl Schema for MyData {
@@ -44,8 +45,12 @@ impl Schema for MyData {
                     schema: <ImportedStruct as Schema>::schema,
                 },
                 FieldDef {
-                    name: "tuple_field",
-                    schema: <(i32, ImportedStruct) as Schema>::schema,
+                    name: "tuple",
+                    schema: <(char, ImportedStruct) as Schema>::schema,
+                },
+                FieldDef {
+                    name: "nested_tuple",
+                    schema: <(char, (i32, ImportedStruct)) as Schema>::schema,
                 },
             ],
         })
