@@ -1,0 +1,12 @@
+[package]
+name = "schemas"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+export = []
+
+[dependencies]
+rawr = { workspace = true }
+linkme = { workspace = true }                       # For some reason we have to import it here too...
+serde = { workspace = true, features = ["derive"] }

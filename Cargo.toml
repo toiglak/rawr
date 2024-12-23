@@ -1,0 +1,16 @@
+[package]
+name = "optimize-out-ctor"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+schemas = { workspace = true }
+
+[workspace]
+members = ["crates/*"]
+
+[workspace.dependencies]
+linkme = "0.3.31"
+rawr = { path = "crates/rawr" }
+schemas = { path = "crates/schemas" }
+serde = "1.0.216"

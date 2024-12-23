@@ -1,0 +1,3 @@
+fn main() {
+    schemas::export();
+}
