@@ -21,6 +21,8 @@ pub enum TransportError {
 
 /////////// Code Generation /////////////
 
+type SchemaFn = fn() -> SchemaDef;
+
 pub struct Codegen {
     output_path: String,
 }
@@ -49,13 +51,12 @@ impl Codegen {
 
         // Group schemas by module
         let mut modules: HashMap<&'static str, Vec<SchemaDef>> = HashMap::new();
-        for schema_fn in SCHEMA_REGISTRY {
-            let schema_def = schema_fn();
-            if let SchemaDef::Struct(struct_def) = &schema_def {
+        for schema in SCHEMA_REGISTRY {
+            if let SchemaDef::Struct(struct_def) = &schema() {
                 modules
                     .entry(struct_def.module_path)
                     .or_insert_with(Vec::new)
-                    .push(schema_def.clone());
+                    .push(schema().clone());
             }
         }
 
@@ -64,99 +65,98 @@ impl Codegen {
         }
     }
 
-    /// Generates TypeScript module bindings for the given schemas. This includes
-    /// creating the necessary directories and files, and writing the type
-    /// definitions and imports.
     fn generate_module(&self, module_path: &'static str, schema_defs: &[SchemaDef]) {
-        // Create the directory for the module
+        let module_dir = self.create_module_directory(module_path);
+        let output_file_path = module_dir.join("index.ts");
+
+        let (imports, body) = self.generate_imports_and_body(module_path, schema_defs);
+
+        let final_output = format!("{}{}", imports, body);
+        std::fs::write(&output_file_path, final_output).expect("Failed to write module bindings");
+    }
+
+    fn create_module_directory(&self, module_path: &str) -> std::path::PathBuf {
         let module_dir =
             std::path::Path::new(&self.output_path).join(module_path.replace("::", "/"));
         std::fs::create_dir_all(&module_dir).expect("Failed to create module directory");
+        module_dir
+    }
 
-        // Define the output file path
-        let output_file_path = module_dir.join("index.ts");
-
-        // Initialize strings to hold imports and type definitions
+    fn generate_imports_and_body(
+        &self,
+        module_path: &str,
+        schema_defs: &[SchemaDef],
+    ) -> (String, String) {
         let mut imports = String::new();
         let mut body = String::new();
         let mut visited_modules = std::collections::HashSet::new();
 
-        // Go over every exported schema in the given module.
         for schema_def in schema_defs {
-            // TODO: This can be abstracted as StructDef::generate or something and
-            // for each variant accordingly.
             match schema_def {
                 SchemaDef::Struct(struct_def) => {
-                    // Identify types from foreign modules and generate import statements
-                    for field in struct_def.fields {
-                        // TODO: This can be abstracted, since all Schema (enum,
-                        // struct) have a module_path.
-                        if let SchemaDef::Struct(struct_def) = (field.schema)() {
-                            let struct_path = struct_def.module_path;
-                            // If the field's module is different from the currently
-                            // generated module and it hasn't been visited yet,
-                            // generate an import statement.
-                            if struct_path != module_path && !visited_modules.contains(struct_path)
-                            {
-                                visited_modules.insert(struct_path);
-                                let import_path =
-                                    self.compute_import_path(module_path, struct_path);
-                                imports.push_str(&format!(
-                                    "import {{ {} }} from '{}';\n",
-                                    struct_def.name, import_path
-                                ));
-                            }
-                        }
-                    }
-
-                    // Generate type definition for the struct
-                    body.push_str(&format!("export type {} = {{\n", struct_def.name));
-                    for field in struct_def.fields {
-                        // Map Rust type to TypeScript type
-                        let ts_type = match (field.schema)() {
-                            SchemaDef::Primitive(ref prim) => {
-                                self.map_primitive_to_typescript(prim)
-                            }
-                            SchemaDef::Struct(ref struct_type) => struct_type.name.to_string(),
-                            SchemaDef::Tuple(ref tuple_schemas) => {
-                                let ts_types: Vec<String> = tuple_schemas
-                                    .iter()
-                                    .map(|schema_fn| match schema_fn() {
-                                        SchemaDef::Primitive(ref prim) => {
-                                            self.map_primitive_to_typescript(prim)
-                                        }
-                                        SchemaDef::Struct(ref struct_type) => {
-                                            struct_type.name.to_string()
-                                        }
-                                        _ => "any".to_string(),
-                                    })
-                                    .collect();
-                                format!("[{}]", ts_types.join(", "))
-                            }
-                        };
-                        // Add field definition to the type
-                        body.push_str(&format!("  {}: {};\n", field.name, ts_type));
-                    }
-                    body.push_str("};\n");
+                    self.generate_imports(
+                        module_path,
+                        struct_def,
+                        &mut imports,
+                        &mut visited_modules,
+                    );
+                    self.generate_struct_body(struct_def, &mut body);
                 }
                 _ => {}
             }
         }
 
-        // Combine imports and type definitions into the final output
-        let final_output = format!("{}{}", imports, body);
-        std::fs::write(&output_file_path, final_output).expect("Failed to write module bindings");
+        (imports, body)
     }
 
-    /// Computes the import path for a given field module relative to the current module.
-    fn compute_import_path(&self, module_path: &str, field_mod: &str) -> String {
-        if field_mod.starts_with(module_path) {
-            // Compute relative path if the field module is a submodule
-            let relative_path = field_mod.strip_prefix(module_path).unwrap();
-            format!(".{}", relative_path.replace("::", "/"))
-        } else {
-            // Compute relative path if the field module is in a different module
-            format!("../{}", field_mod.replace("::", "/"))
+    fn generate_imports(
+        &self,
+        module_path: &str,
+        struct_def: &StructDef,
+        imports: &mut String,
+        visited_modules: &mut std::collections::HashSet<&str>,
+    ) {
+        // Identify types from foreign modules and generate import statements
+        for field in struct_def.fields {
+            // TODO: This can be abstracted, since almost all
+            // Schema-s (enum, struct) have a module_path.
+            if let SchemaDef::Struct(field_struct_def) = (field.schema)() {
+                // If the field's module is different from the currently generated
+                // module and it hasn't been visited yet, generate an import
+                // statement.
+                let struct_path = field_struct_def.module_path;
+                if struct_path != module_path && !visited_modules.contains(struct_path) {
+                    visited_modules.insert(struct_path);
+                    let import_path = self.compute_import_path(module_path, struct_path);
+                    imports.push_str(&format!(
+                        "import {{ {} }} from '{}';\n",
+                        field_struct_def.name, import_path
+                    ));
+                }
+            }
+        }
+    }
+
+    fn generate_struct_body(&self, struct_def: &StructDef, body: &mut String) {
+        body.push_str(&format!("export type {} = {{\n", struct_def.name));
+        for field in struct_def.fields {
+            let ts_type = self.map_schema_to_typescript(&field.schema);
+            body.push_str(&format!("  {}: {};\n", field.name, ts_type));
+        }
+        body.push_str("};\n");
+    }
+
+    fn map_schema_to_typescript(&self, schema: &SchemaFn) -> String {
+        match schema() {
+            SchemaDef::Primitive(ref prim) => self.map_primitive_to_typescript(prim),
+            SchemaDef::Struct(ref struct_type) => struct_type.name.to_string(),
+            SchemaDef::Tuple(ref tuple_schemas) => {
+                let ts_types: Vec<String> = tuple_schemas
+                    .iter()
+                    .map(|schema| self.map_schema_to_typescript(schema))
+                    .collect();
+                format!("[{}]", ts_types.join(", "))
+            }
         }
     }
 
@@ -171,6 +171,18 @@ impl Codegen {
             | PrimitiveType::F64 => "number".to_string(),
             PrimitiveType::Bool => "boolean".to_string(),
             _ => "any".to_string(),
+        }
+    }
+
+    /// Computes the import path for a given field module relative to the current module.
+    fn compute_import_path(&self, module_path: &str, field_mod: &str) -> String {
+        if field_mod.starts_with(module_path) {
+            // Compute relative path if the field module is a submodule
+            let relative_path = field_mod.strip_prefix(module_path).unwrap();
+            format!(".{}", relative_path.replace("::", "/"))
+        } else {
+            // Compute relative path if the field module is in a different module
+            format!("../{}", field_mod.replace("::", "/"))
         }
     }
 }
