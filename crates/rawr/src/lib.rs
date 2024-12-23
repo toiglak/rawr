@@ -182,14 +182,64 @@ impl Codegen {
     }
 
     /// Computes the import path for a given field module relative to the current module.
-    fn compute_import_path(&self, module_path: &str, field_mod: &str) -> String {
-        if field_mod.starts_with(module_path) {
-            // Compute relative path if the field module is a submodule
-            let relative_path = field_mod.strip_prefix(module_path).unwrap();
-            format!(".{}", relative_path.replace("::", "/"))
-        } else {
-            // Compute relative path if the field module is in a different module
-            format!("../{}", field_mod.replace("::", "/"))
+    fn compute_import_path(&self, current: &str, target: &str) -> String {
+        let current_segments: Vec<&str> = current.split("::").collect();
+        let target_segments: Vec<&str> = target.split("::").collect();
+        let mut i = 0;
+        while i < current_segments.len()
+            && i < target_segments.len()
+            && current_segments[i] == target_segments[i]
+        {
+            i += 1;
         }
+        let leftover_current = &current_segments[i..];
+        let leftover_target = &target_segments[i..];
+        let up = "../".repeat(leftover_current.len());
+        let down = leftover_target.join("/");
+
+        if down.is_empty() {
+            if up.is_empty() {
+                ".".to_string()
+            } else {
+                up.trim_end_matches('/').to_string()
+            }
+        } else {
+            format!("{}{}", if up.is_empty() { "./" } else { &up }, down)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_import_path() {
+        let codegen = Codegen::new();
+
+        assert_eq!(
+            codegen.compute_import_path("crate_name::module::nested", "crate_name::module"),
+            ".."
+        );
+
+        assert_eq!(
+            codegen.compute_import_path("crate_name::module::nested", "crate_name"),
+            "../.."
+        );
+
+        assert_eq!(
+            codegen.compute_import_path("crate_name", "crate_name::module::nested"),
+            "./module/nested"
+        );
+
+        assert_eq!(
+            codegen.compute_import_path("crate_name", "other_crate"),
+            "../other_crate"
+        );
+
+        assert_eq!(
+            codegen.compute_import_path("crate_name::module", "other_crate::module"),
+            "../../other_crate/module"
+        );
     }
 }

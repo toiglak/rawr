@@ -1,6 +1,8 @@
 use rawr::{FieldDef, Schema, SchemaDef, StructDef};
 use serde::{Deserialize, Serialize};
 
+pub mod nested_module;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportedStruct {
     pub value: String,
