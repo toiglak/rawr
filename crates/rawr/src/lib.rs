@@ -138,56 +138,80 @@ impl Codegen {
         }
 
         for (module_path, schema_defs) in modules {
-            self.generate_module_bindings(module_path, &schema_defs);
+            self.generate_module(module_path, &schema_defs);
         }
     }
 
-    fn generate_module_bindings(&self, module_path: &'static str, schema_defs: &[SchemaDef]) {
+    /// Generates TypeScript module bindings for the given schemas. This includes
+    /// creating the necessary directories and files, and writing the type
+    /// definitions and imports.
+    fn generate_module(&self, module_path: &'static str, schema_defs: &[SchemaDef]) {
+        // Create the directory for the module
         let module_dir =
             std::path::Path::new(&self.output_path).join(module_path.replace("::", "/"));
         std::fs::create_dir_all(&module_dir).expect("Failed to create module directory");
+
+        // Define the output file path
         let output_file_path = module_dir.join("index.ts");
 
+        // Initialize strings to hold imports and type definitions
         let mut imports = String::new();
         let mut body = String::new();
         let mut visited_modules = std::collections::HashSet::new();
 
+        // Go over every exported schema in the given module.
         for schema_def in schema_defs {
             if let SchemaDef::Struct(struct_def) = schema_def {
-                // Collect cross-module references
+                // Identify types from foreign modules and generate import statements
                 for field in &struct_def.fields {
-                    if let SchemaDef::Struct(field_struct_def) = (field.schema)() {
-                        let field_mod = field_struct_def.module_path;
-                        if field_mod != module_path && !visited_modules.contains(field_mod) {
-                            visited_modules.insert(field_mod);
-                            let import_path = if field_mod.starts_with(module_path) {
-                                let relative_path = field_mod.strip_prefix(module_path).unwrap();
-                                format!(".{}", relative_path.replace("::", "/"))
-                            } else {
-                                format!("../{}", field_mod.replace("::", "/"))
-                            };
+                    // TODO: This can be abstracted, since all Schema (enum,
+                    // struct) have a module_path.
+                    if let SchemaDef::Struct(struct_def) = (field.schema)() {
+                        let struct_path = struct_def.module_path;
+                        // If the field's module is different from the currently
+                        // generated module and it hasn't been visited yet,
+                        // generate an import statement.
+                        if struct_path != module_path && !visited_modules.contains(struct_path) {
+                            visited_modules.insert(struct_path);
+                            let import_path = self.compute_import_path(module_path, struct_path);
                             imports.push_str(&format!(
                                 "import {{ {} }} from '{}';\n",
-                                field_struct_def.name, import_path
+                                struct_def.name, import_path
                             ));
                         }
                     }
                 }
-                // Generate type definition
+
+                // Generate type definition for the struct
                 body.push_str(&format!("export type {} = {{\n", struct_def.name));
                 for field in &struct_def.fields {
+                    // Map Rust type to TypeScript type
                     let ts_type = match (field.schema)() {
                         SchemaDef::Primitive(ref prim) => self.map_primitive_to_typescript(prim),
                         SchemaDef::Struct(ref struct_type) => struct_type.name.to_string(),
                     };
+                    // Add field definition to the type
                     body.push_str(&format!("  {}: {};\n", field.name, ts_type));
                 }
                 body.push_str("};\n");
             }
         }
 
+        // Combine imports and type definitions into the final output
         let final_output = format!("{}{}", imports, body);
         std::fs::write(&output_file_path, final_output).expect("Failed to write module bindings");
+    }
+
+    /// Computes the import path for a given field module relative to the current module.
+    fn compute_import_path(&self, module_path: &str, field_mod: &str) -> String {
+        if field_mod.starts_with(module_path) {
+            // Compute relative path if the field module is a submodule
+            let relative_path = field_mod.strip_prefix(module_path).unwrap();
+            format!(".{}", relative_path.replace("::", "/"))
+        } else {
+            // Compute relative path if the field module is in a different module
+            format!("../{}", field_mod.replace("::", "/"))
+        }
     }
 
     fn map_primitive_to_typescript(&self, primitive: &PrimitiveType) -> String {
