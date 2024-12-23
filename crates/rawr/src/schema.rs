@@ -5,6 +5,30 @@ pub trait Schema {
     fn schema() -> SchemaDef;
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum SchemaDef {
+    Primitive(PrimitiveType),
+    Struct(StructDef),
+    Tuple(&'static [fn() -> SchemaDef]),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PrimitiveType {
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
+    F32,
+    F64,
+    Bool,
+    Char,
+    String,
+}
+
 macro_rules! impl_schema_for_primitive {
   ($($t:ty => $variant:ident),*) => {
     $(
@@ -32,30 +56,6 @@ impl_schema_for_primitive!(
   bool => Bool,
   char => Char
 );
-
-#[derive(Debug, Clone, Copy)]
-pub enum SchemaDef {
-    Primitive(PrimitiveType),
-    Struct(StructDef),
-    Tuple(&'static [fn() -> SchemaDef]),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PrimitiveType {
-    U8,
-    U16,
-    U32,
-    U64,
-    I8,
-    I16,
-    I32,
-    I64,
-    F32,
-    F64,
-    Bool,
-    Char,
-    String,
-}
 
 #[derive(Debug, Clone, Copy)]
 pub struct StructDef {

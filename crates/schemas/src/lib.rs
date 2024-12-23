@@ -18,7 +18,7 @@ pub struct MyData {
     pub count: i32,
     pub is_active: bool,
     pub imported: ImportedStruct,
-    pub tuple_field: (i32, String),
+    pub tuple_field: (i32, ImportedStruct),
 }
 
 impl Schema for MyData {
@@ -45,7 +45,7 @@ impl Schema for MyData {
                 },
                 FieldDef {
                     name: "tuple_field",
-                    schema: <(i32, String) as Schema>::schema,
+                    schema: <(i32, ImportedStruct) as Schema>::schema,
                 },
             ],
         })
