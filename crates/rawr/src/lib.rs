@@ -114,7 +114,7 @@ impl Codegen {
 
     fn generate_imports(
         &self,
-        module_path: &str,
+        current_module: &str,
         struct_def: &StructDef,
         imports: &mut String,
         visited_modules: &mut HashSet<&str>,
@@ -127,10 +127,11 @@ impl Codegen {
                 // If the field's module is different from the currently generated
                 // module and it hasn't been visited yet, generate an import
                 // statement.
-                let struct_path = struct_def.module_path;
-                if struct_path != module_path && !visited_modules.contains(struct_path) {
-                    visited_modules.insert(struct_path);
-                    let import_path = self.compute_import_path(module_path, struct_path);
+                let struct_module = struct_def.module_path;
+                if struct_module != current_module && !visited_modules.contains(struct_module) {
+                    visited_modules.insert(struct_module);
+                    let import_path =
+                        compute_relative_path_from_module(current_module, struct_module);
                     imports.push_str(&format!(
                         "import {{ {} }} from '{}';\n",
                         struct_def.name, import_path
@@ -180,32 +181,32 @@ impl Codegen {
             PrimitiveType::String => "string".to_string(),
         }
     }
+}
 
-    /// Computes the import path for a given field module relative to the current module.
-    fn compute_import_path(&self, current: &str, target: &str) -> String {
-        let current_segments: Vec<&str> = current.split("::").collect();
-        let target_segments: Vec<&str> = target.split("::").collect();
-        let mut i = 0;
-        while i < current_segments.len()
-            && i < target_segments.len()
-            && current_segments[i] == target_segments[i]
-        {
-            i += 1;
-        }
-        let leftover_current = &current_segments[i..];
-        let leftover_target = &target_segments[i..];
-        let up = "../".repeat(leftover_current.len());
-        let down = leftover_target.join("/");
+/// Computes relative typescript import path from `current` to `target` rust module.
+fn compute_relative_path_from_module(current: &str, target: &str) -> String {
+    let current_segments: Vec<&str> = current.split("::").collect();
+    let target_segments: Vec<&str> = target.split("::").collect();
+    let mut i = 0;
+    while i < current_segments.len()
+        && i < target_segments.len()
+        && current_segments[i] == target_segments[i]
+    {
+        i += 1;
+    }
+    let leftover_current = &current_segments[i..];
+    let leftover_target = &target_segments[i..];
+    let up = "../".repeat(leftover_current.len());
+    let down = leftover_target.join("/");
 
-        if down.is_empty() {
-            if up.is_empty() {
-                ".".to_string()
-            } else {
-                up.trim_end_matches('/').to_string()
-            }
+    if down.is_empty() {
+        if up.is_empty() {
+            ".".to_string()
         } else {
-            format!("{}{}", if up.is_empty() { "./" } else { &up }, down)
+            up.trim_end_matches('/').to_string()
         }
+    } else {
+        format!("{}{}", if up.is_empty() { "./" } else { &up }, down)
     }
 }
 
@@ -214,32 +215,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_compute_import_path() {
-        let codegen = Codegen::new();
+    #[rustfmt::skip]
+    fn test_compute_relative_file_path_from_module() {
+        let f = compute_relative_path_from_module;
 
-        assert_eq!(
-            codegen.compute_import_path("crate_name::module::nested", "crate_name::module"),
-            ".."
-        );
-
-        assert_eq!(
-            codegen.compute_import_path("crate_name::module::nested", "crate_name"),
-            "../.."
-        );
-
-        assert_eq!(
-            codegen.compute_import_path("crate_name", "crate_name::module::nested"),
-            "./module/nested"
-        );
-
-        assert_eq!(
-            codegen.compute_import_path("crate_name", "other_crate"),
-            "../other_crate"
-        );
-
-        assert_eq!(
-            codegen.compute_import_path("crate_name::module", "other_crate::module"),
-            "../../other_crate/module"
-        );
+        assert_eq!(f("crate_name",                 "crate_name::module::nested"), "./module/nested");
+        assert_eq!(f("crate_name::module::nested", "crate_name::module"),         "..");
+        assert_eq!(f("crate_name::module::nested", "crate_name"),                 "../..");
+        assert_eq!(f("crate_name",                 "other_crate"),                "../other_crate");
+        assert_eq!(f("crate_name::module",         "other_crate::module"),        "../../other_crate/module");
     }
 }
