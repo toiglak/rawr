@@ -7,6 +7,8 @@ edition = "2021"
 rawr = { workspace = true }
 schemas = { workspace = true }
 linkme = { workspace = true }
+walkdir = { workspace = true }
+colored = { workspace = true }
 
 [workspace]
 members = ["crates/*"]
@@ -16,3 +18,5 @@ linkme = "0.3.31"
 rawr = { path = "crates/rawr" }
 schemas = { path = "crates/schemas" }
 serde = "1.0.216"
+walkdir = "2.5.0"
+colored = "2.2.0"
