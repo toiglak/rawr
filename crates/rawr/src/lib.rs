@@ -57,7 +57,6 @@ impl Codegen {
         let mut modules: HashMap<&'static str, Vec<SchemaDef>> = HashMap::new();
         for schema in SCHEMA_REGISTRY {
             match schema() {
-                // Don't generate bindings for primitive types or tuples.
                 SchemaDef::Primitive(..) | SchemaDef::Tuple(..) => {}
                 SchemaDef::Struct(struct_def) => {
                     modules
@@ -106,8 +105,9 @@ impl Codegen {
 
         for schema_def in schema_defs {
             match schema_def {
+                SchemaDef::Primitive(..) | SchemaDef::Tuple(..) => {}
                 SchemaDef::Struct(struct_def) => {
-                    self.generate_imports(
+                    self.generate_imports_for_struct(
                         module_path,
                         struct_def,
                         &mut imports,
@@ -116,16 +116,21 @@ impl Codegen {
                     self.generate_struct_body(struct_def, &mut body);
                 }
                 SchemaDef::Enum(enum_def) => {
+                    self.generate_imports_for_enum(
+                        module_path,
+                        enum_def,
+                        &mut imports,
+                        &mut visited_modules,
+                    );
                     self.generate_enum_body(enum_def, &mut body);
                 }
-                _ => {}
             }
         }
 
         (imports, body)
     }
 
-    fn generate_imports(
+    fn generate_imports_for_struct(
         &self,
         current_module: &str,
         struct_def: &StructDef,
@@ -150,6 +155,60 @@ impl Codegen {
                         struct_def.name, import_path
                     ));
                 }
+            }
+        }
+    }
+
+    fn generate_imports_for_enum(
+        &self,
+        current_module: &str,
+        enum_def: &EnumDef,
+        imports: &mut String,
+        visited_modules: &mut HashSet<&str>,
+    ) {
+        for variant in enum_def.variants {
+            match variant {
+                EnumVariant::Tuple { fields, .. } => {
+                    for field in *fields {
+                        if let SchemaDef::Struct(struct_def) = (field)() {
+                            let struct_module = struct_def.module_path;
+                            if struct_module != current_module
+                                && !visited_modules.contains(struct_module)
+                            {
+                                visited_modules.insert(struct_module);
+                                let import_path = compute_relative_path_from_module(
+                                    current_module,
+                                    struct_module,
+                                );
+                                imports.push_str(&format!(
+                                    "import {{ {} }} from '{}';\n",
+                                    struct_def.name, import_path
+                                ));
+                            }
+                        }
+                    }
+                }
+                EnumVariant::Struct { fields, .. } => {
+                    for field in *fields {
+                        if let SchemaDef::Struct(struct_def) = (field.schema)() {
+                            let struct_module = struct_def.module_path;
+                            if struct_module != current_module
+                                && !visited_modules.contains(struct_module)
+                            {
+                                visited_modules.insert(struct_module);
+                                let import_path = compute_relative_path_from_module(
+                                    current_module,
+                                    struct_module,
+                                );
+                                imports.push_str(&format!(
+                                    "import {{ {} }} from '{}';\n",
+                                    struct_def.name, import_path
+                                ));
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
         }
     }
