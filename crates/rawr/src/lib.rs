@@ -56,11 +56,21 @@ impl Codegen {
         // Group schemas by module
         let mut modules: HashMap<&'static str, Vec<SchemaDef>> = HashMap::new();
         for schema in SCHEMA_REGISTRY {
-            if let SchemaDef::Struct(struct_def) = &schema() {
-                modules
-                    .entry(struct_def.module_path)
-                    .or_insert_with(Vec::new)
-                    .push(schema().clone());
+            match schema() {
+                // Don't generate bindings for primitive types or tuples.
+                SchemaDef::Primitive(..) | SchemaDef::Tuple(..) => {}
+                SchemaDef::Struct(struct_def) => {
+                    modules
+                        .entry(struct_def.module_path)
+                        .or_insert_with(Vec::new)
+                        .push(schema().clone());
+                }
+                SchemaDef::Enum(enum_def) => {
+                    modules
+                        .entry(enum_def.module_path)
+                        .or_insert_with(Vec::new)
+                        .push(schema().clone());
+                }
             }
         }
 
@@ -104,6 +114,9 @@ impl Codegen {
                         &mut visited_modules,
                     );
                     self.generate_struct_body(struct_def, &mut body);
+                }
+                SchemaDef::Enum(enum_def) => {
+                    self.generate_enum_body(enum_def, &mut body);
                 }
                 _ => {}
             }
@@ -150,6 +163,45 @@ impl Codegen {
         body.push_str("};\n");
     }
 
+    fn generate_enum_body(&self, enum_def: &EnumDef, body: &mut String) {
+        body.push_str(&format!("export type {} =\n", enum_def.name));
+        for variant in enum_def.variants {
+            match variant {
+                EnumVariant::Unit { name } => {
+                    body.push_str(&format!("  | {{ type: \"{}\" }}\n", name));
+                }
+                EnumVariant::Tuple { name, fields } => {
+                    if fields.len() == 1 {
+                        let ts_type = self.map_schema_to_type(&fields[0]);
+                        body.push_str(&format!(
+                            "  | {{ type: \"{}\"; data: {} }}\n",
+                            name, ts_type
+                        ));
+                    } else {
+                        let ts_types: Vec<String> = fields
+                            .iter()
+                            .map(|schema| self.map_schema_to_type(schema))
+                            .collect();
+                        body.push_str(&format!(
+                            "  | {{ type: \"{}\"; data: [{}] }}\n",
+                            name,
+                            ts_types.join(", ")
+                        ));
+                    }
+                }
+                EnumVariant::Struct { name, fields } => {
+                    body.push_str(&format!("  | {{ type: \"{}\"; data: {{\n", name));
+                    for field in *fields {
+                        let ts_type = self.map_schema_to_type(&field.schema);
+                        body.push_str(&format!("    {}: {};\n", field.name, ts_type));
+                    }
+                    body.push_str("  } }\n");
+                }
+            }
+        }
+        body.push_str(";\n");
+    }
+
     fn map_schema_to_type(&self, schema: &SchemaFn) -> String {
         match schema() {
             SchemaDef::Primitive(ref prim) => self.map_primitive_to_type(prim),
@@ -161,6 +213,7 @@ impl Codegen {
                     .collect();
                 format!("[{}]", ts_types.join(", "))
             }
+            SchemaDef::Enum(enum_def) => enum_def.name.to_string(),
         }
     }
 

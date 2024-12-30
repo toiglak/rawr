@@ -10,6 +10,7 @@ pub enum SchemaDef {
     Primitive(PrimitiveType),
     Tuple(&'static [fn() -> SchemaDef]),
     Struct(StructDef),
+    Enum(EnumDef),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -98,4 +99,35 @@ pub struct StructDef {
 pub struct FieldDef {
     pub name: &'static str,
     pub schema: fn() -> SchemaDef,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct EnumDef {
+    pub name: &'static str,
+    pub module_path: &'static str,
+    pub representation: EnumRepresentation,
+    pub variants: &'static [EnumVariant],
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum EnumRepresentation {
+    Adjacent {
+        tag: &'static str,
+        content: &'static str,
+    },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum EnumVariant {
+    Unit {
+        name: &'static str,
+    },
+    Tuple {
+        name: &'static str,
+        fields: &'static [fn() -> SchemaDef],
+    },
+    Struct {
+        name: &'static str,
+        fields: &'static [FieldDef],
+    },
 }
