@@ -8,8 +8,8 @@ pub trait Schema {
 #[derive(Debug, Clone, Copy)]
 pub enum SchemaDef {
     Primitive(PrimitiveType),
-    Struct(StructDef),
     Tuple(&'static [fn() -> SchemaDef]),
+    Struct(StructDef),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -57,19 +57,6 @@ impl_schema_for_primitive!(
   char => Char
 );
 
-#[derive(Debug, Clone, Copy)]
-pub struct StructDef {
-    pub name: &'static str,
-    pub module_path: &'static str,
-    pub fields: &'static [FieldDef],
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct FieldDef {
-    pub name: &'static str,
-    pub schema: fn() -> SchemaDef,
-}
-
 macro_rules! impl_schema_for_tuples {
   ($(($($name:ident),+)),+) => {
       $(
@@ -99,3 +86,16 @@ impl_schema_for_tuples!(
     (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O),
     (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P)
 );
+
+#[derive(Debug, Clone, Copy)]
+pub struct StructDef {
+    pub name: &'static str,
+    pub module_path: &'static str,
+    pub fields: &'static [FieldDef],
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct FieldDef {
+    pub name: &'static str,
+    pub schema: fn() -> SchemaDef,
+}
