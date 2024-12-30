@@ -1,6 +1,6 @@
 use rawr::{FieldDef, Schema, SchemaDef, StructDef};
 
-use crate::MyData;
+use crate::structure::MyData;
 
 pub struct NestedModuleStruct {
     pub value: MyData,
