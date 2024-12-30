@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
@@ -26,6 +27,7 @@ pub enum TransportError {
 /////////// Code Generation /////////////
 
 type SchemaFn = fn() -> SchemaDef;
+type StringCow = Cow<'static, str>;
 
 pub struct Codegen {
     output_path: String,
@@ -237,7 +239,7 @@ impl Codegen {
                             name, ts_type
                         ));
                     } else {
-                        let ts_types: Vec<String> = fields
+                        let ts_types: Vec<StringCow> = fields
                             .iter()
                             .map(|schema| self.map_schema_to_type(schema))
                             .collect();
@@ -261,22 +263,22 @@ impl Codegen {
         body.push_str(";\n");
     }
 
-    fn map_schema_to_type(&self, schema: &SchemaFn) -> String {
+    fn map_schema_to_type(&self, schema: &SchemaFn) -> StringCow {
         match schema() {
-            SchemaDef::Primitive(ref prim) => self.map_primitive_to_type(prim),
-            SchemaDef::Struct(ref struct_type) => struct_type.name.to_string(),
+            SchemaDef::Primitive(ref prim) => self.map_primitive_to_type(prim).into(),
+            SchemaDef::Struct(ref struct_type) => struct_type.name.into(),
             SchemaDef::Tuple(ref tuple_schemas) => {
-                let ts_types: Vec<String> = tuple_schemas
+                let ts_types: Vec<StringCow> = tuple_schemas
                     .iter()
                     .map(|schema| self.map_schema_to_type(schema))
                     .collect();
-                format!("[{}]", ts_types.join(", "))
+                format!("[{}]", ts_types.join(", ")).into()
             }
-            SchemaDef::Enum(enum_def) => enum_def.name.to_string(),
+            SchemaDef::Enum(enum_def) => enum_def.name.into(),
         }
     }
 
-    fn map_primitive_to_type(&self, primitive: &PrimitiveType) -> String {
+    fn map_primitive_to_type(&self, primitive: &PrimitiveType) -> &'static str {
         match primitive {
             PrimitiveType::U8
             | PrimitiveType::U16
@@ -287,10 +289,10 @@ impl Codegen {
             | PrimitiveType::I32
             | PrimitiveType::I64
             | PrimitiveType::F32
-            | PrimitiveType::F64 => "number".to_string(),
-            PrimitiveType::Bool => "boolean".to_string(),
-            PrimitiveType::Char => "string".to_string(),
-            PrimitiveType::String => "string".to_string(),
+            | PrimitiveType::F64 => "number",
+            PrimitiveType::Bool => "boolean",
+            PrimitiveType::Char => "string",
+            PrimitiveType::String => "string",
         }
     }
 }
