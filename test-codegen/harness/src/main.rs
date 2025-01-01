@@ -35,31 +35,16 @@ const _: () = {
 };
 
 fn main() {
+    // TODO: Manually export the types using Codegen builder methods.
+
     // We need to invoke linker on the schemas crate so that the static variables
     // are actually "initialized" and added to the binary. Otherwise, the registry
     // will be empty and we won't generate any bindings.
     schemas::import();
-    rawr::Codegen::new().export_to("snapshot/generated").run();
-    diff::compare_directories("snapshot/expected", "snapshot/generated").unwrap();
-}
 
-#[cfg(test)]
-mod tests {
-    // use super::*;
+    let generated_path = "test-codegen/snapshots/typescript-generated";
+    let expected_path = "test-codegen/snapshots/typescript-expected";
 
-    #[test]
-    fn assert_snapshot() {
-        // Currently following test doesn't work, probably because Rust runs tests
-        // in a special way which doesn't include the exports for some reason.
-        //
-        // This is fine, we should manually export the types using Codegen builder
-        // methods either way. TODO: Do it later.
-
-        // // We need to invoke linker on the schemas crate so that the static variables
-        // // are actually "initialized" and added to the binary. Otherwise, the registry
-        // // will be empty and we won't generate any bindings.
-        // schemas::import();
-        // rawr::Codegen::new().export_to("snapshot/generated").run();
-        // diff::compare_directories("snapshot/expected", "snapshot/generated").unwrap();
-    }
+    rawr::Codegen::new().export_to(generated_path).run();
+    diff::compare_directories(expected_path, generated_path).unwrap();
 }

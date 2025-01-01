@@ -1,22 +1,10 @@
-[package]
-name = "rawr-tests"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-rawr = { workspace = true }
-schemas = { workspace = true }
-linkme = { workspace = true }
-walkdir = { workspace = true }
-colored = { workspace = true }
-
 [workspace]
-members = ["crates/*"]
+resolver = "2"
+members = ["rawr-rust", "test-codegen/harness"]
 
 [workspace.dependencies]
 linkme = "0.3.31"
-rawr = { path = "crates/rawr" }
-schemas = { path = "crates/schemas" }
-serde = "1.0.216"
+rawr = { path = "rawr-rust" }
+serde = "1.0.217"
 walkdir = "2.5.0"
 colored = "2.2.0"
