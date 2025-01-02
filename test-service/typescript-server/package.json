@@ -1,0 +1,14 @@
+{
+  "name": "typescript-server",
+  "module": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "bun src/index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
