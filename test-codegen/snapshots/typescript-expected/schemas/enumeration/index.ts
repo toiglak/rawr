@@ -1,4 +1,4 @@
-import { ImportedStruct } from '../module';
+import { ImportedStruct } from "../module";
 export type EnumAdjacent =
   | { type: "VariantA" }
   | { type: "VariantB"; data: [] }

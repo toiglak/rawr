@@ -18,6 +18,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn async_main() -> Result<()> {
+    //// Generate bindings
+
+    log::info!("Generating TypeScript bindings...");
+    let path = "test-service/typescript-bindings";
+    schemas::export_to(path);
+
+    //// Start servers
+
     let rust_server = ServiceConfig {
         name: "Rust",
         build_cmd: Some(vec!["cargo", "build", "--bin", "rust_server"]),
@@ -39,6 +47,8 @@ async fn async_main() -> Result<()> {
     // Wait for the servers to start.
     // TODO: We could wait for servers to print "READY" to stdout instead.
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    //// Test clients
 
     let rust_client = ServiceConfig {
         name: "Rust",
@@ -88,6 +98,8 @@ async fn start_server(cfg: ServiceConfig) -> Result<Server> {
         Command::new(build[0])
             .args(&build[1..])
             .current_dir(working_dir)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .kill_on_drop(true)
             .status()
             .await?;
@@ -103,8 +115,6 @@ async fn start_server(cfg: ServiceConfig) -> Result<Server> {
             .args(&run_cmd[1..])
             .current_dir(working_dir)
             .env("SERVER_ADDR", &addr_)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::piped())
             .kill_on_drop(true)
             .output()
             .await

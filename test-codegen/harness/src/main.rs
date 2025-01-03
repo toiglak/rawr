@@ -29,22 +29,10 @@ impl Schema for MainStruct {
     }
 }
 
-const _: () = {
-    #[linkme::distributed_slice(rawr::SCHEMA_REGISTRY)]
-    static __: fn() -> SchemaDef = <MainStruct as Schema>::schema;
-};
-
 fn main() {
-    // TODO: Manually export the types using Codegen builder methods.
-
-    // We need to invoke linker on the schemas crate so that the static variables
-    // are actually "initialized" and added to the binary. Otherwise, the registry
-    // will be empty and we won't generate any bindings.
-    schemas::import();
-
     let generated_path = "test-codegen/snapshots/typescript-generated";
     let expected_path = "test-codegen/snapshots/typescript-expected";
 
-    rawr::Codegen::new().export_to(generated_path).run();
+    schemas::export_to(generated_path);
     diff::compare_directories(expected_path, generated_path).unwrap();
 }

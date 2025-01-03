@@ -1,10 +1,8 @@
 [package]
-name = "schemas"
+name = "schemas_subcrate"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-schemas_subcrate = { path = "schemas_subcrate" }
-
 rawr = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::module::ImportedStruct;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum EnumAdjacent {
     VariantA,
@@ -66,8 +66,3 @@ impl Schema for EnumAdjacent {
         })
     }
 }
-
-const _: () = {
-    #[linkme::distributed_slice(rawr::SCHEMA_REGISTRY)]
-    static __: fn() -> SchemaDef = <EnumAdjacent as Schema>::schema;
-};

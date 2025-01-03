@@ -1,19 +1,17 @@
 use rawr::{FieldDef, Schema, SchemaDef, StructDef};
 
-use crate::enumeration::EnumAdjacent;
-
-pub struct NestedModuleStruct {
-    pub value: EnumAdjacent,
+pub struct StructFromOtherCrate {
+    pub value: i32,
 }
 
-impl Schema for NestedModuleStruct {
+impl Schema for StructFromOtherCrate {
     fn schema() -> SchemaDef {
         SchemaDef::Struct(StructDef {
-            name: "NestedModuleStruct",
+            name: "StructFromOtherCrate",
             module_path: ::core::module_path!(),
             fields: &[FieldDef {
                 name: "value",
-                schema: <EnumAdjacent as Schema>::schema,
+                schema: <i32 as Schema>::schema,
             }],
         })
     }

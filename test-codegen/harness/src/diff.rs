@@ -76,6 +76,6 @@ pub fn compare_directories(expected_dir: &str, actual_dir: &str) -> Result<(), &
 
     match matching {
         true => Ok(()),
-        false => Err("Directories do not match"),
+        false => Err("Snapshots differ"),
     }
 }

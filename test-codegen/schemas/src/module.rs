@@ -20,8 +20,3 @@ impl Schema for ImportedStruct {
         })
     }
 }
-
-const _: () = {
-    #[linkme::distributed_slice(rawr::SCHEMA_REGISTRY)]
-    static __: fn() -> SchemaDef = <ImportedStruct as Schema>::schema;
-};

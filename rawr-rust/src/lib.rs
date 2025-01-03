@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap}, // Replaced HashSet with BTreeSet
     fs,
     path::{Path, PathBuf},
 };
@@ -26,10 +26,19 @@ pub enum TransportError {
 
 /////////// Code Generation /////////////
 
-type SchemaFn = fn() -> SchemaDef;
+pub type SchemaFn = fn() -> SchemaDef;
 type StringCow = Cow<'static, str>;
 
 pub struct Codegen {
+    // NOTE: We're using BTreeSet instead of HashSet to ensure a consistent
+    // ordering of the generated bindings (e.g., order of the generated imports),
+    // which is important for the snapshot tests.
+    //
+    // In case the order of the generated bindings still changes (e.g., due to
+    // *probably* nondeterministic `SchemaFn` function pointer in `SchemaDef`),
+    // consider sorting beforehand by `name`, etc.
+    schemas: BTreeSet<SchemaDef>,
+
     output_path: String,
 }
 
@@ -37,17 +46,34 @@ impl Codegen {
     pub fn new() -> Self {
         Codegen {
             output_path: String::new(),
+            schemas: BTreeSet::new(),
         }
+    }
+
+    /// Export the schema from a type. All of its dependent schemas will be exported as well.
+    pub fn export_type<T: Schema>(mut self) -> Self {
+        self.export_schema(T::schema());
+        self
+    }
+
+    /// Export schema. All of its dependent schemas will be exported as well.
+    pub fn export_schema(&mut self, schema: SchemaDef) {
+        // Skip if the schema has already been exported
+        if self.schemas.contains(&schema) {
+            return;
+        }
+
+        self.export_dependencies(schema);
+        self.schemas.insert(schema);
+    }
+
+    /// Recursively export all type dependencies of a schema
+    fn export_dependencies(&mut self, schema: SchemaDef) {
+        schema.visit_dependencies(|dep| self.export_schema(dep));
     }
 
     pub fn export_to(mut self, output_path: &str) -> Self {
         self.output_path = output_path.to_string();
-        self
-    }
-
-    pub fn debug(self) -> Self {
-        println!("Output path: {:?}", self.output_path);
-        println!("Registry length: {:?}", SCHEMA_REGISTRY.len());
         self
     }
 
@@ -57,20 +83,20 @@ impl Codegen {
 
         // Group schemas by module
         let mut modules: HashMap<&'static str, Vec<SchemaDef>> = HashMap::new();
-        for schema in SCHEMA_REGISTRY {
-            match schema() {
+        for schema in &self.schemas {
+            match schema {
                 SchemaDef::Primitive(..) | SchemaDef::Tuple(..) => {}
                 SchemaDef::Struct(struct_def) => {
                     modules
                         .entry(struct_def.module_path)
                         .or_insert_with(Vec::new)
-                        .push(schema().clone());
+                        .push(schema.clone());
                 }
                 SchemaDef::Enum(enum_def) => {
                     modules
                         .entry(enum_def.module_path)
                         .or_insert_with(Vec::new)
-                        .push(schema().clone());
+                        .push(schema.clone());
                 }
             }
         }
@@ -84,135 +110,73 @@ impl Codegen {
         let module_dir = self.create_module_directory(module_path);
         let output_file_path = module_dir.join("index.ts");
 
-        let (imports, body) = self.generate_imports_and_body(module_path, schema_defs);
+        let imports = self.generate_imports(module_path, schema_defs);
+        let body = self.generate_body(schema_defs);
 
         let final_output = format!("{}{}", imports, body);
         fs::write(&output_file_path, final_output).expect("Failed to write module bindings");
+    }
+
+    fn generate_imports(&self, module_path: &str, schema_defs: &[SchemaDef]) -> String {
+        //// Create a list of all type dependencies that are not in this module
+
+        let mut dependencies = BTreeSet::new();
+
+        fn visit(dependencies: &mut BTreeSet<SchemaDef>, dep: SchemaDef, module_path: &&str) {
+            // In case the dependent type is a tuple, visit all its fields
+            if let Some(fields) = dep.as_tuple() {
+                for field in fields {
+                    visit(dependencies, field(), module_path);
+                }
+            }
+
+            // Add the type dependency if it's not in the same module
+            if let Some(schema_module) = dep.module_path() {
+                if *module_path != schema_module {
+                    dependencies.insert(dep);
+                }
+            }
+        }
+
+        for schema in schema_defs {
+            schema.visit_dependencies(|dep| visit(&mut dependencies, dep, &module_path));
+        }
+
+        //// Generate import statements
+
+        let mut imports = String::new();
+
+        for dep in dependencies {
+            imports.push_str(&format!(
+                "import {{ {} }} from \"{}\";\n",
+                dep.name().unwrap(),
+                compute_relative_path_from_module(module_path, dep.module_path().unwrap())
+            ));
+        }
+
+        imports
+    }
+
+    fn generate_body(&self, schema_defs: &[SchemaDef]) -> String {
+        let mut body = String::new();
+        for schema in schema_defs {
+            match schema {
+                SchemaDef::Struct(struct_def) => {
+                    self.generate_struct_body(struct_def, &mut body);
+                }
+                SchemaDef::Enum(enum_def) => {
+                    self.generate_enum_body(enum_def, &mut body);
+                }
+                _ => {}
+            }
+        }
+        body
     }
 
     fn create_module_directory(&self, module_path: &str) -> PathBuf {
         let module_dir = Path::new(&self.output_path).join(module_path.replace("::", "/"));
         fs::create_dir_all(&module_dir).expect("Failed to create module directory");
         module_dir
-    }
-
-    fn generate_imports_and_body(
-        &self,
-        module_path: &str,
-        schema_defs: &[SchemaDef],
-    ) -> (String, String) {
-        let mut imports = String::new();
-        let mut body = String::new();
-        let mut visited_modules = HashSet::new();
-
-        for schema_def in schema_defs {
-            match schema_def {
-                SchemaDef::Primitive(..) | SchemaDef::Tuple(..) => {}
-                SchemaDef::Struct(struct_def) => {
-                    self.generate_imports_for_struct(
-                        module_path,
-                        struct_def,
-                        &mut imports,
-                        &mut visited_modules,
-                    );
-                    self.generate_struct_body(struct_def, &mut body);
-                }
-                SchemaDef::Enum(enum_def) => {
-                    self.generate_imports_for_enum(
-                        module_path,
-                        enum_def,
-                        &mut imports,
-                        &mut visited_modules,
-                    );
-                    self.generate_enum_body(enum_def, &mut body);
-                }
-            }
-        }
-
-        (imports, body)
-    }
-
-    fn generate_imports_for_struct(
-        &self,
-        current_module: &str,
-        struct_def: &StructDef,
-        imports: &mut String,
-        visited_modules: &mut HashSet<&str>,
-    ) {
-        // Identify types from foreign modules and generate import statements
-        for field in struct_def.fields {
-            // TODO: This can be abstracted, since almost all
-            // Schema-s (enum, struct) have a module_path.
-            if let SchemaDef::Struct(struct_def) = (field.schema)() {
-                // If the field's module is different from the currently generated
-                // module and it hasn't been visited yet, generate an import
-                // statement.
-                let struct_module = struct_def.module_path;
-                if struct_module != current_module && !visited_modules.contains(struct_module) {
-                    visited_modules.insert(struct_module);
-                    let import_path =
-                        compute_relative_path_from_module(current_module, struct_module);
-                    imports.push_str(&format!(
-                        "import {{ {} }} from '{}';\n",
-                        struct_def.name, import_path
-                    ));
-                }
-            }
-        }
-    }
-
-    fn generate_imports_for_enum(
-        &self,
-        current_module: &str,
-        enum_def: &EnumDef,
-        imports: &mut String,
-        visited_modules: &mut HashSet<&str>,
-    ) {
-        for variant in enum_def.variants {
-            match variant {
-                EnumVariant::Tuple { fields, .. } => {
-                    for field in *fields {
-                        if let SchemaDef::Struct(struct_def) = (field)() {
-                            let struct_module = struct_def.module_path;
-                            if struct_module != current_module
-                                && !visited_modules.contains(struct_module)
-                            {
-                                visited_modules.insert(struct_module);
-                                let import_path = compute_relative_path_from_module(
-                                    current_module,
-                                    struct_module,
-                                );
-                                imports.push_str(&format!(
-                                    "import {{ {} }} from '{}';\n",
-                                    struct_def.name, import_path
-                                ));
-                            }
-                        }
-                    }
-                }
-                EnumVariant::Struct { fields, .. } => {
-                    for field in *fields {
-                        if let SchemaDef::Struct(struct_def) = (field.schema)() {
-                            let struct_module = struct_def.module_path;
-                            if struct_module != current_module
-                                && !visited_modules.contains(struct_module)
-                            {
-                                visited_modules.insert(struct_module);
-                                let import_path = compute_relative_path_from_module(
-                                    current_module,
-                                    struct_module,
-                                );
-                                imports.push_str(&format!(
-                                    "import {{ {} }} from '{}';\n",
-                                    struct_def.name, import_path
-                                ));
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
     }
 
     fn generate_struct_body(&self, struct_def: &StructDef, body: &mut String) {

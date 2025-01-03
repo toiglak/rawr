@@ -1,20 +1,22 @@
 use rawr::{FieldDef, Schema, SchemaDef, StructDef};
+use schemas_subcrate::StructFromOtherCrate;
 
-use crate::module::ImportedStruct;
+use crate::module::{nested_module::NestedModuleStruct, ImportedStruct};
 
-pub struct MyData {
+pub struct Structure {
     pub name: String,
     pub count: i32,
     pub is_active: bool,
     pub imported: ImportedStruct,
     pub tuple: (char, ImportedStruct),
-    pub nested_tuple: (char, (i32, ImportedStruct)),
+    pub nested_tuple: (char, (i32, NestedModuleStruct)),
+    pub crate_dependency: StructFromOtherCrate,
 }
 
-impl Schema for MyData {
+impl Schema for Structure {
     fn schema() -> SchemaDef {
         SchemaDef::Struct(StructDef {
-            name: "MyData",
+            name: "Structure",
             module_path: ::core::module_path!(),
             fields: &[
                 FieldDef {
@@ -39,14 +41,13 @@ impl Schema for MyData {
                 },
                 FieldDef {
                     name: "nested_tuple",
-                    schema: <(char, (i32, ImportedStruct)) as Schema>::schema,
+                    schema: <(char, (i32, NestedModuleStruct)) as Schema>::schema,
+                },
+                FieldDef {
+                    name: "crate_dependency",
+                    schema: <StructFromOtherCrate as Schema>::schema,
                 },
             ],
         })
     }
 }
-
-const _: () = {
-    #[linkme::distributed_slice(rawr::SCHEMA_REGISTRY)]
-    static __: fn() -> SchemaDef = <MyData as Schema>::schema;
-};
