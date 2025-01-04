@@ -148,7 +148,7 @@ impl Codegen {
 
         for dep in dependencies {
             imports.push_str(&format!(
-                "import {{ {} }} from \"{}\";\n",
+                "import {{ type {} }} from \"{}\";\n",
                 dep.name().unwrap(),
                 compute_relative_path_from_module(module_path, dep.module_path().unwrap())
             ));

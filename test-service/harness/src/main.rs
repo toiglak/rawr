@@ -12,7 +12,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     rt.block_on(async_main()).unwrap();
 
     // NOTE: When the runtime is dropped here, it will also kill all the child
-    // processes because we have set `kill_on_drop(true)`.
+    // processes because we have set `kill_on_drop(true)`. This is important, so
+    // that the servers are killed when the harness exits.
 
     Ok(())
 }
