@@ -1,8 +1,10 @@
 use rawr::{FieldDef, Schema, SchemaDef, StructDef};
 use schemas_subcrate::StructFromOtherCrate;
+use serde::{Deserialize, Serialize};
 
 use crate::module::{nested_module::NestedModuleStruct, ImportedStruct};
 
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct Structure {
     pub name: String,
     pub count: i32,

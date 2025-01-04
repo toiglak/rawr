@@ -18,6 +18,7 @@ glob = "0.3.2"
 log = "0.4.22"
 rawr = { path = "rawr-rust" }
 serde = "1.0.217"
+serde_json = "1.0.134"
 tokio = { version = "1.42", features = ["full"] }
 tokio-tungstenite = "0.26.1"
 walkdir = "2.5.0"

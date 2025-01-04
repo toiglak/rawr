@@ -1,5 +1,7 @@
 use rawr::{FieldDef, Schema, SchemaDef, StructDef};
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct StructFromOtherCrate {
     pub value: i32,
 }

@@ -3,9 +3,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::module::ImportedStruct;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "data")]
 pub enum EnumAdjacent {
+    #[default]
     VariantA,
     VariantB(),
     VariantC(i32),

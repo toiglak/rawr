@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+schemas = { path = "../../test-codegen/schemas" }
+
+futures = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 tokio-tungstenite = { workspace = true }
-futures = { workspace = true }

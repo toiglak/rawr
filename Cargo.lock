@@ -602,6 +602,8 @@ name = "rust_client"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "schemas",
+ "serde_json",
  "tokio",
  "tokio-tungstenite",
 ]
@@ -611,6 +613,8 @@ name = "rust_server"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "schemas",
+ "serde_json",
  "tokio",
  "tokio-tungstenite",
 ]
@@ -620,6 +624,12 @@ name = "rustc-demangle"
 version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "719b953e2095829ee67db738b3bfa9fa368c94900df327b3f07fe6e794d2fe1f"
+
+[[package]]
+name = "ryu"
+version = "1.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 
 [[package]]
 name = "same-file"
@@ -671,6 +681,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "serde_json"
+version = "1.0.134"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d00f4175c42ee48b15416f6193a959ba3a0d67fc699a0db9ad12df9f83991c7d"
+dependencies = [
+ "itoa",
+ "memchr",
+ "ryu",
+ "serde",
 ]
 
 [[package]]

@@ -1,7 +1,9 @@
 use rawr::{FieldDef, Schema, SchemaDef, StructDef};
+use serde::{Deserialize, Serialize};
 
 use crate::enumeration::EnumAdjacent;
 
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct NestedModuleStruct {
     pub value: EnumAdjacent,
 }

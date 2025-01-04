@@ -1,35 +1,7 @@
 use std::process::Command;
 
-use rawr::{FieldDef, Schema, SchemaDef, StructDef};
-use schemas::module::ImportedStruct;
-
 mod diff;
 
-#[allow(unused)]
-#[derive(Debug, Clone)]
-struct MainStruct {
-    a: i32,
-    b: ImportedStruct,
-}
-
-impl Schema for MainStruct {
-    fn schema() -> SchemaDef {
-        SchemaDef::Struct(StructDef {
-            name: "MainStruct",
-            module_path: ::core::module_path!(),
-            fields: &[
-                FieldDef {
-                    name: "a",
-                    schema: <i32 as Schema>::schema,
-                },
-                FieldDef {
-                    name: "b",
-                    schema: <ImportedStruct as Schema>::schema,
-                },
-            ],
-        })
-    }
-}
 fn main() {
     std::env::set_var("RUST_LOG", "info");
     env_logger::builder().format_timestamp(None).init();
