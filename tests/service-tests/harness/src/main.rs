@@ -19,11 +19,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn async_main() -> Result<()> {
+    let service_tests_path = format!("{}/..", env!("CARGO_MANIFEST_DIR")).leak();
+    let typescript_client_path = format!("{service_tests_path}/typescript-client").leak();
+    let typescript_server_path = format!("{service_tests_path}/typescript-server").leak();
+    let typescript_bindings_path = format!("{service_tests_path}/typescript-bindings").leak();
+
     //// Generate bindings
 
     log::info!("Generating TypeScript bindings...");
-    let path = "test-service/typescript-bindings";
-    schemas::export_to(path);
+    schemas::export_to(typescript_bindings_path);
 
     //// Start servers
 
@@ -37,7 +41,7 @@ async fn async_main() -> Result<()> {
         name: "TypeScript",
         build_cmd: None,
         run_cmd: vec!["bun", "src/index.ts"],
-        working_dir: "test-service/typescript-server",
+        working_dir: typescript_server_path,
     };
 
     let rust_server = start_server(rust_server).await?;
@@ -61,7 +65,7 @@ async fn async_main() -> Result<()> {
         name: "TypeScript",
         build_cmd: None,
         run_cmd: vec!["bun", "src/index.ts"],
-        working_dir: "test-service/typescript-client",
+        working_dir: typescript_client_path,
     };
 
     for server in servers {

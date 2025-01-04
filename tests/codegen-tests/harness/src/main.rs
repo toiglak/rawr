@@ -4,10 +4,12 @@ mod diff;
 
 fn main() {
     std::env::set_var("RUST_LOG", "info");
-    env_logger::builder().format_timestamp(None).init();
+    env_logger::builder().init();
 
-    let generated_path = "test-codegen/snapshots/typescript-generated";
-    let expected_path = "test-codegen/snapshots/typescript-expected";
+    let snapshots_path = &format!("{}/../snapshots", env!("CARGO_MANIFEST_DIR"));
+    let generated_path = &format!("{snapshots_path}/typescript-generated");
+    let expected_path = &format!("{snapshots_path}/typescript-expected");
+    let tsconfig_path = &format!("{snapshots_path}/tsconfig.json");
 
     log::info!("Generating bindings...");
     schemas::export_to(generated_path);
@@ -15,7 +17,7 @@ fn main() {
     log::info!("Type-checking bindings...");
 
     let output = Command::new("bunx")
-        .args(&["tsc", "--build", "test-codegen/snapshots/tsconfig.json"])
+        .args(&["tsc", "--build", tsconfig_path])
         .output()
         .expect("failed to execute process");
 

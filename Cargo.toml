@@ -2,13 +2,16 @@
 resolver = "2"
 members = [
     "rawr-rust",
-    "test-codegen/harness",
-    "test-service/harness",
-    "test-service/rust-client",
-    "test-service/rust-server",
+    "tests/codegen-tests/harness",
+    "tests/service-tests/harness",
+    "tests/service-tests/rust-client",
+    "tests/service-tests/rust-server",
 ]
 
 [workspace.dependencies]
+rawr = { path = "rawr-rust" }
+schemas = { path = "tests/schemas" }
+
 anyhow = "1.0.95"
 colored = "2.2.0"
 duct = "0.13.7"
@@ -16,7 +19,6 @@ env_logger = "0.11.6"
 futures = "0.3"
 glob = "0.3.2"
 log = "0.4.22"
-rawr = { path = "rawr-rust" }
 serde = "1.0.217"
 serde_json = "1.0.134"
 tokio = { version = "1.42", features = ["full"] }

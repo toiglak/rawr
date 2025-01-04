@@ -1,10 +1,10 @@
 [package]
-name = "rust_server"
+name = "rust_client"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-schemas = { path = "../../test-codegen/schemas" }
+schemas = { workspace = true }
 
 futures = { workspace = true }
 serde_json = { workspace = true }
