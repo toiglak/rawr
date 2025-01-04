@@ -72,8 +72,6 @@ pub fn compare_directories(expected_dir: &str, actual_dir: &str) -> Result<(), &
         }
     }
 
-    println!();
-
     match matching {
         true => Ok(()),
         false => Err("Snapshots differ"),

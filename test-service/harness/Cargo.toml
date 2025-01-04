@@ -8,7 +8,6 @@ rawr = { workspace = true }
 schemas = { path = "../../test-codegen/schemas" }
 
 anyhow = { workspace = true }
-duct = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
 tokio = { workspace = true }

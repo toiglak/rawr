@@ -6,5 +6,10 @@ edition = "2021"
 [dependencies]
 rawr = { workspace = true }
 schemas = { path = "../schemas" }
-walkdir = { workspace = true }
+
+anyhow = { workspace = true }
 colored = { workspace = true }
+env_logger = { workspace = true }
+glob = { workspace = true }
+log = { workspace = true }
+walkdir = { workspace = true }

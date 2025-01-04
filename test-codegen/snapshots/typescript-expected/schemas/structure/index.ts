@@ -1,6 +1,6 @@
-import { ImportedStruct } from "../module";
-import { NestedModuleStruct } from "../module/nested_module";
-import { StructFromOtherCrate } from "../../schemas_subcrate";
+import { type ImportedStruct } from "../module";
+import { type NestedModuleStruct } from "../module/nested_module";
+import { type StructFromOtherCrate } from "../../schemas_subcrate";
 export type Structure = {
   name: string;
   count: number;
