@@ -34,6 +34,24 @@ pub struct TestClient {
 }
 
 impl TestClient {
+    /// Create a new client. Returns a future that must be spawned on a runtime for
+    /// the client to start processing requests and responses.
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// let (client_transport, server_transport) = rawr::transport();
+    ///
+    /// let server_task = TestServer::new(server_transport, ServiceImpl);
+    /// let (mut client, client_task) = TestClient::new(client_transport);
+    ///
+    /// // Run tasks.
+    /// tokio::spawn(client_task);
+    /// tokio::spawn(server_task);
+    ///
+    /// let response = client.say_hello("World".to_string()).await;
+    /// println!("{}", response);
+    /// ```
     pub fn new(
         transport: (Tx<Request<TestRequest>>, Rx<Response<TestResponse>>),
     ) -> (Self, impl Future<Output = ()>) {
@@ -92,7 +110,7 @@ impl TestServer {
     /// let server_task = TestServer::new(server_transport, ServiceImpl);
     /// let (mut client, client_task) = TestClient::new(client_transport);
     ///
-    /// // Run handlers.
+    /// // Run tasks.
     /// tokio::spawn(client_task);
     /// tokio::spawn(server_task);
     ///

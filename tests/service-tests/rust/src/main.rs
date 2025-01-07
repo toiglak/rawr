@@ -15,7 +15,7 @@ async fn main() {
     let (mut client, client_task) = TestClient::new(client_transport);
     let server_task = TestServer::new(server_transport, ServiceImpl);
 
-    // Run handlers.
+    // Run tasks.
     tokio::spawn(client_task);
     tokio::spawn(server_task);
 
