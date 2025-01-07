@@ -20,8 +20,8 @@ async fn main() {
     let (client_transport, server_transport) = rawr::transport();
 
     // Create server and client.
-    let server_task = TestServer::new(server_transport, ServiceImpl {});
     let (client, client_task) = TestClient::new(client_transport);
+    let server_task = TestServer::new(server_transport, ServiceImpl {});
 
     // Run tasks.
     tokio::spawn(client_task);
@@ -38,6 +38,6 @@ async fn main() {
     // For posterity: https://www.youtube.com/watch?v=ms8zKpS_dZE
     // ASSERT: Requests should be processed concurrently (take ~1s).
     if let Err(_) = time::timeout(Duration::from_secs(2), make_requests).await {
-        panic!("for_each_concurrent took more than 2 seconds");
+        panic!("test took more than 1 second to complete");
     }
 }
