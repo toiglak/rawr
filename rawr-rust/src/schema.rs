@@ -1,4 +1,8 @@
-use crate::SchemaFn;
+// NOTE: We use this to prevent "infinitely sized structures" in [SchemaDef],
+// since it can contain itself.
+//
+/// Treat this as "a pointer to a schema definition".
+pub type SchemaFn = fn() -> SchemaDef;
 
 pub trait Schema {
     fn schema() -> SchemaDef;
