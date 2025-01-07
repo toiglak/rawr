@@ -27,7 +27,7 @@ pub enum TransportError {
 pub struct Request<P> {
     /// Unique identifier used to send the response back to the correct caller
     /// when multiple calls to the same method were made.
-    pub id: u64,
+    pub id: u32,
     /// Request payload. It consists of the arguments of the rpc call.
     pub data: P,
 }
@@ -35,7 +35,7 @@ pub struct Request<P> {
 pub struct Response<P> {
     /// Unique identifier used to send the response back to the correct caller
     /// when multiple calls to the same method were made.
-    pub id: u64,
+    pub id: u32,
     /// Request payload. It consists of the return value of the rpc call.
     pub data: P,
 }

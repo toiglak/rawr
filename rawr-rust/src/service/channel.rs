@@ -14,7 +14,7 @@ pub fn transport<Req, Res>() -> ((Tx<Req>, Rx<Res>), (Rx<Req>, Tx<Res>)) {
 pub struct Tx<T>(UnboundedSender<T>);
 
 impl<T> Tx<T> {
-    pub fn send(&mut self, message: T) {
+    pub fn send(&self, message: T) {
         self.0.unbounded_send(message).unwrap();
     }
 }

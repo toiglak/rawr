@@ -5,8 +5,6 @@ edition = "2021"
 
 [dependencies]
 rawr_macros = { path = "macros" }
+dashmap.workspace = true
 futures.workspace = true
 thiserror.workspace = true
-
-[dev-dependencies]
-tokio.workspace = true

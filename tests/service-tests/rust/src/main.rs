@@ -12,8 +12,8 @@ impl TestService for ServiceImpl {
 async fn main() {
     let (client_transport, server_transport) = rawr::transport();
 
-    let (mut client, client_task) = TestClient::new(client_transport);
     let server_task = TestServer::new(server_transport, ServiceImpl);
+    let (client, client_task) = TestClient::new(client_transport);
 
     // Run tasks.
     tokio::spawn(client_task);

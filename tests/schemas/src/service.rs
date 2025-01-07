@@ -1,9 +1,15 @@
 #![allow(non_camel_case_types)]
 
 use ::std::string::String;
-use std::future::Future;
+use std::{
+    future::Future,
+    sync::atomic::{AtomicU32, Ordering},
+    sync::Arc,
+};
 
 use ::rawr::{Request, Response, Rx, Tx};
+use rawr::dashmap::DashMap;
+use rawr::futures::channel::oneshot;
 use serde::{Deserialize, Serialize};
 
 #[allow(async_fn_in_trait)]
@@ -29,8 +35,9 @@ pub enum TestResponse {
 // to the trait in the IDE!
 
 pub struct TestClient {
+    counter: AtomicU32,
     req_tx: Tx<Request<TestRequest>>,
-    res_rx: Rx<Response<TestResponse>>,
+    pending: Arc<DashMap<u32, oneshot::Sender<Response<TestResponse>>>>,
 }
 
 impl TestClient {
@@ -55,42 +62,43 @@ impl TestClient {
     pub fn new(
         transport: (Tx<Request<TestRequest>>, Rx<Response<TestResponse>>),
     ) -> (Self, impl Future<Output = ()>) {
-        let (req_rx, res_tx) = transport;
-
-        let run_client = async move {
-            // while let Some(req) = req_rx.recv().await {
-            //     match req.data {
-            //         TestRequest::say_hello(args) => {
-            //             let ret = self.hello(args.0).await;
-            //             let resp = Response {
-            //                 id: req.id,
-            //                 data: TestResponse::say_hello(ret),
-            //             };
-            //             res_tx.send(resp);
-            //         }
-            //     };
-            // }
+        let (req_tx, mut res_tx) = transport;
+        let pending = Arc::new(DashMap::new());
+        let client = Self {
+            counter: AtomicU32::new(0),
+            req_tx,
+            pending: pending.clone(),
         };
 
-        (
-            Self {
-                req_tx: req_rx,
-                res_rx: res_tx,
-            },
-            run_client,
-        )
+        let run_client = {
+            async move {
+                while let Some(resp) = res_tx.recv().await {
+                    if let Some((_, sender)) = pending.remove(&resp.id) {
+                        sender.send(resp).ok();
+                    } else {
+                        // log::trace!("Received response with unknown id: {}", resp.id);
+                    }
+                }
+            }
+        };
+
+        (client, run_client)
     }
 
-    pub async fn say_hello(&mut self, arg: String) -> String {
+    pub async fn say_hello(&self, arg: String) -> String {
+        let (tx, rx) = oneshot::channel();
+        let id = self.counter.fetch_add(1, Ordering::SeqCst);
+        self.pending.insert(id, tx);
         let req = Request {
-            id: 0,
+            id,
             data: TestRequest::say_hello((arg,)),
         };
         self.req_tx.send(req);
-        let resp = self.res_rx.recv().await.unwrap();
-        let resp = resp.data;
-        match resp {
+        let resp = rx.await.expect("Failed to receive response");
+        match resp.data {
             TestResponse::say_hello(data) => data,
+            #[allow(unreachable_patterns)]
+            _ => panic!("Unexpected response"),
         }
     }
 }
@@ -121,23 +129,18 @@ impl TestServer {
         server_transport: (Rx<Request<TestRequest>>, Tx<Response<TestResponse>>),
         handler: impl TestService,
     ) {
-
-        // let (req_rx, res_tx) = server_transport;
-
-        // while let Some(request) = req_rx.recv().await {
-        //     let handler = handler.clone();
-        //     let mut res_tx = res_tx.clone();
-
-        //     match request.data {
-        //         TestRequest::say_hello(args) => {
-        //             let ret = handler.hello(args.0).await;
-        //             let resp = Response {
-        //                 id: request.id,
-        //                 data: TestResponse::say_hello(ret),
-        //             };
-        //             res_tx.send(resp);
-        //         }
-        //     };
-        // }
+        let (mut req_rx, mut res_tx) = server_transport;
+        while let Some(req) = req_rx.recv().await {
+            let resp = match req.data {
+                TestRequest::say_hello((arg,)) => {
+                    let data = handler.say_hello(arg).await;
+                    Response {
+                        id: req.id,
+                        data: TestResponse::say_hello(data),
+                    }
+                }
+            };
+            res_tx.send(resp);
+        }
     }
 }
