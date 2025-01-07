@@ -545,8 +545,10 @@ dependencies = [
 name = "rawr"
 version = "0.1.0"
 dependencies = [
+ "futures",
  "rawr_macros",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -606,6 +608,17 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-tungstenite",
+]
+
+[[package]]
+name = "rust_inprocess_service_tests"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "rawr",
+ "schemas",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
