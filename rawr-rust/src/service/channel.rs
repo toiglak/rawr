@@ -3,13 +3,13 @@ use futures::{
     StreamExt,
 };
 
+// TODO: Consider accepting any channel implementation implementing a trait.
+
 pub fn transport<Req, Res>() -> ((Tx<Req>, Rx<Res>), (Rx<Req>, Tx<Res>)) {
     let (req_tx, req_rx) = mpsc::unbounded();
     let (res_tx, res_rx) = mpsc::unbounded();
     ((Tx(req_tx), Rx(res_rx)), (Rx(req_rx), Tx(res_tx)))
 }
-
-// TODO: Consider abstracting the specific channel type, over a trait.
 
 pub struct Tx<T>(UnboundedSender<T>);
 

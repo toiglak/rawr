@@ -14,7 +14,6 @@ pub mod channel;
 pub use channel::*;
 
 pub type Result<T> = std::result::Result<T, TransportError>;
-
 pub type ClientTransport<Req, Res> = (Tx<Request<Req>>, Rx<Response<Res>>);
 pub type ServerTransport<Req, Res> = (Rx<Request<Req>>, Tx<Response<Res>>);
 
