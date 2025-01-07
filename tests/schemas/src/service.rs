@@ -1,13 +1,9 @@
-use futures::stream::StreamExt;
-use rawr::futures::channel::oneshot;
-use rawr::{dashmap::DashMap, futures};
-use rawr::{Request, Response, Rx, Tx};
-use serde::{Deserialize, Serialize};
-use std::{
-    future::Future,
-    sync::atomic::{AtomicU32, Ordering},
-    sync::Arc,
+use rawr::{
+    futures::{self, StreamExt},
+    AbstractClient, ClientTransport, Request, Response, ServerTransport,
 };
+use serde::{Deserialize, Serialize};
+use std::future::Future;
 
 #[allow(async_fn_in_trait)]
 pub trait TestService: Clone + 'static + Send + Sync {
@@ -28,16 +24,9 @@ pub enum TestResponse {
     say_hello(String),
 }
 
-// CRAZY IDEA: Now that we have `TestClient` not take any "special" functions, we
-// can directly implement the `TestService` trait for `TestClient`! It may not seem
-// like a big thing but it is! It means that "calls" on the client point directly
-// to the trait in the IDE!
-
 #[derive(Clone)]
 pub struct TestClient {
-    counter: Arc<AtomicU32>,
-    req_tx: Tx<Request<TestRequest>>,
-    pending: Arc<DashMap<u32, oneshot::Sender<Response<TestResponse>>>>,
+    inner: AbstractClient<TestRequest, TestResponse>,
 }
 
 impl TestClient {
@@ -60,54 +49,30 @@ impl TestClient {
     /// println!("{}", response);
     /// ```
     pub fn new(
-        transport: (Tx<Request<TestRequest>>, Rx<Response<TestResponse>>),
+        transport: ClientTransport<TestRequest, TestResponse>,
     ) -> (Self, impl Future<Output = ()>) {
-        let (req_tx, mut res_tx) = transport;
-        let pending = Arc::new(DashMap::new());
-        let client = Self {
-            counter: Arc::new(AtomicU32::new(0)),
-            req_tx,
-            pending: pending.clone(),
-        };
-
-        let run_client = {
-            async move {
-                while let Some(resp) = res_tx.recv().await {
-                    if let Some((_, sender)) = pending.remove(&resp.id) {
-                        sender.send(resp).ok();
-                    } else {
-                        // log::trace!("Received response with unknown id: {}", resp.id);
-                    }
-                }
-            }
-        };
-
-        (client, run_client)
+        let (inner, client_task) = AbstractClient::new(transport);
+        (Self { inner }, client_task)
     }
 }
 
 impl TestService for TestClient {
     async fn say_hello(&self, arg: String) -> String {
-        let (tx, rx) = oneshot::channel();
-        let id = self.counter.fetch_add(1, Ordering::SeqCst);
-        self.pending.insert(id, tx);
-        let req = Request {
-            id,
-            data: TestRequest::say_hello((arg,)),
-        };
-        self.req_tx.send(req);
-        let resp = rx.await.expect("Failed to receive response");
-        match resp.data {
-            TestResponse::say_hello(data) => data,
-            #[allow(unreachable_patterns)]
-            _ => panic!("Unexpected response"),
+        let req = TestRequest::say_hello((arg,));
+        let res = self.inner.make_request(req).await;
+
+        #[allow(irrefutable_let_patterns)]
+        if let TestResponse::say_hello(ret) = res {
+            ret
+        } else {
+            // Perhaps this should return an error instead of panicking?
+            panic!("Unexpected response")
         }
     }
 }
 
 pub struct TestServer;
 
-#[expect(unused)]
 impl TestServer {
     /// Create a new server. Returns a future that must be spawned on a runtime for
     /// the server to start processing requests.
@@ -128,21 +93,22 @@ impl TestServer {
     /// println!("{}", response);
     /// ```
     pub async fn new(
-        server_transport: (Rx<Request<TestRequest>>, Tx<Response<TestResponse>>),
+        server_transport: ServerTransport<TestRequest, TestResponse>,
         handler: impl TestService,
     ) {
-        let (mut req_rx, res_tx) = server_transport;
+        let (req_rx, res_tx) = server_transport;
 
-        futures::stream::unfold(req_rx, move |mut req_rx| async {
+        let requests = futures::stream::unfold(req_rx, move |mut req_rx| async {
             req_rx.recv().await.map(|req| (req, req_rx))
-        })
-        .for_each_concurrent(None, move |req| {
+        });
+
+        let process_request = move |req: Request<TestRequest>| {
             let res_tx = res_tx.clone();
             let handler = handler.clone();
             async move {
                 let resp = match req.data {
-                    TestRequest::say_hello((arg,)) => {
-                        let data = handler.say_hello(arg).await;
+                    TestRequest::say_hello((arg0,)) => {
+                        let data = handler.say_hello(arg0).await;
                         Response {
                             id: req.id,
                             data: TestResponse::say_hello(data),
@@ -151,7 +117,8 @@ impl TestServer {
                 };
                 res_tx.send(resp);
             }
-        })
-        .await;
+        };
+
+        requests.for_each_concurrent(None, process_request).await;
     }
 }

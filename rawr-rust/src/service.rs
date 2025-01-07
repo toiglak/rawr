@@ -1,18 +1,22 @@
-use futures::{
-    channel::{mpsc, oneshot},
-    lock::Mutex,
-};
 use std::{
-    collections::HashMap,
-    sync::{atomic::AtomicU64, Arc},
+    future::Future,
+    sync::atomic::{AtomicU32, Ordering},
+    sync::Arc,
 };
+
+use futures::channel::oneshot;
 use thiserror::Error;
+
+use crate::dashmap::DashMap;
 
 pub mod channel;
 
 pub use channel::*;
 
 pub type Result<T> = std::result::Result<T, TransportError>;
+
+pub type ClientTransport<Req, Res> = (Tx<Request<Req>>, Rx<Response<Res>>);
+pub type ServerTransport<Req, Res> = (Rx<Request<Req>>, Tx<Response<Res>>);
 
 #[derive(Debug, Clone, Error)]
 pub enum TransportError {
@@ -40,68 +44,60 @@ pub struct Response<P> {
     pub data: P,
 }
 
-#[expect(unused)]
-pub struct Client<ReqData, ResData> {
-    counter: AtomicU64,
-    request_tx: Mutex<mpsc::UnboundedSender<Request<ReqData>>>,
-    response_map: Arc<Mutex<HashMap<u64, oneshot::Sender<Response<ResData>>>>>,
+pub struct AbstractClient<Req, Res> {
+    counter: Arc<AtomicU32>,
+    req_tx: Tx<Request<Req>>,
+    res_map: Arc<DashMap<u32, oneshot::Sender<Response<Res>>>>,
 }
 
-impl<ReqData, ResData> Client<ReqData, ResData> {
-    #[expect(unused)]
-    pub async fn new() -> (
-        mpsc::UnboundedReceiver<Request<ReqData>>,
-        mpsc::UnboundedSender<Response<ResData>>,
-        Self,
-    ) {
-        let (request_tx, request_rx) = mpsc::unbounded::<Request<ReqData>>();
-        let (response_tx, mut response_rx) = mpsc::unbounded::<Response<ResData>>();
-        let response_map: Arc<Mutex<HashMap<u64, oneshot::Sender<Response<ResData>>>>>;
-        response_map = Arc::new(Mutex::new(HashMap::new()));
+impl<Req, Res> AbstractClient<Req, Res> {
+    pub fn new(transport: ClientTransport<Req, Res>) -> (Self, impl Future<Output = ()>) {
+        let (req_tx, res_rx) = transport;
 
-        let response_map_ = response_map.clone();
+        let res_map = Arc::new(DashMap::new());
 
-        todo!();
-        // tokio::spawn(async move {
-        //     while let Some(response) = response_rx.next().await {
-        //         if let Some(sender) = response_map_.lock().await.remove(&response.id) {
-        //             sender.send(response).ok();
-        //         }
-        //     }
-        // });
+        let client = Self {
+            counter: Arc::new(AtomicU32::new(0)),
+            req_tx,
+            res_map: res_map.clone(),
+        };
 
-        (
-            request_rx,
-            response_tx,
-            Self {
-                counter: AtomicU64::new(0),
-                request_tx: Mutex::new(request_tx),
-                response_map,
-            },
-        )
+        (client, handle_responses(res_rx, res_map))
     }
 
-    #[expect(unused)]
-    pub async fn make_request(&self, req: ReqData) -> ResData {
-        let id = self
-            .counter
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    pub async fn make_request(&self, data: Req) -> Res {
+        //// Make a request.
+        let id = self.counter.fetch_add(1, Ordering::SeqCst);
+        let (tx, rx) = oneshot::channel();
+        self.res_map.insert(id, tx);
+        self.req_tx.send(Request { id, data });
 
-        // Create a oneshot channel to receive the response
-        let (sender, receiver) = oneshot::channel();
-        self.response_map.lock().await.insert(id, sender);
+        //// Wait for the response.
+        let resp = rx.await.expect("Failed to receive response");
+        resp.data
+    }
+}
 
-        // Send the request
+impl<Req, Res> Clone for AbstractClient<Req, Res> {
+    fn clone(&self) -> Self {
+        Self {
+            counter: self.counter.clone(),
+            req_tx: self.req_tx.clone(),
+            res_map: self.res_map.clone(),
+        }
+    }
+}
 
-        todo!();
-        // let data = serde_json::to_string(&req).unwrap();
-        // let request = Request { id, payload: data };
-        // self.request_tx.lock().await.send(request).await.ok();
-
-        todo!();
-        // Receive the response
-        // let response = receiver.await.unwrap();
-        // serde_json::from_str(&response.data).unwrap()
+async fn handle_responses<ResData>(
+    mut res_rx: Rx<Response<ResData>>,
+    req_map: Arc<DashMap<u32, oneshot::Sender<Response<ResData>>>>,
+) {
+    while let Some(resp) = res_rx.recv().await {
+        if let Some((_, sender)) = req_map.remove(&resp.id) {
+            sender.send(resp).ok();
+        } else {
+            // log::trace!("Received response with unknown id: {}", resp.id);
+        }
     }
 }
 
