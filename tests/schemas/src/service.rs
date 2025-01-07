@@ -1,28 +1,27 @@
-#![allow(non_camel_case_types)]
-
-use ::std::string::String;
+use futures::stream::StreamExt;
+use rawr::futures::channel::oneshot;
+use rawr::{dashmap::DashMap, futures};
+use rawr::{Request, Response, Rx, Tx};
+use serde::{Deserialize, Serialize};
 use std::{
     future::Future,
     sync::atomic::{AtomicU32, Ordering},
     sync::Arc,
 };
 
-use ::rawr::{Request, Response, Rx, Tx};
-use rawr::dashmap::DashMap;
-use rawr::futures::channel::oneshot;
-use serde::{Deserialize, Serialize};
-
 #[allow(async_fn_in_trait)]
-pub trait TestService: 'static + Send + Sync {
+pub trait TestService: Clone + 'static + Send + Sync {
     async fn say_hello(&self, arg: String) -> String;
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "method", content = "payload")]
 pub enum TestRequest {
     say_hello((String,)),
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "method", content = "payload")]
 pub enum TestResponse {
@@ -34,8 +33,9 @@ pub enum TestResponse {
 // like a big thing but it is! It means that "calls" on the client point directly
 // to the trait in the IDE!
 
+#[derive(Clone)]
 pub struct TestClient {
-    counter: AtomicU32,
+    counter: Arc<AtomicU32>,
     req_tx: Tx<Request<TestRequest>>,
     pending: Arc<DashMap<u32, oneshot::Sender<Response<TestResponse>>>>,
 }
@@ -65,7 +65,7 @@ impl TestClient {
         let (req_tx, mut res_tx) = transport;
         let pending = Arc::new(DashMap::new());
         let client = Self {
-            counter: AtomicU32::new(0),
+            counter: Arc::new(AtomicU32::new(0)),
             req_tx,
             pending: pending.clone(),
         };
@@ -84,8 +84,10 @@ impl TestClient {
 
         (client, run_client)
     }
+}
 
-    pub async fn say_hello(&self, arg: String) -> String {
+impl TestService for TestClient {
+    async fn say_hello(&self, arg: String) -> String {
         let (tx, rx) = oneshot::channel();
         let id = self.counter.fetch_add(1, Ordering::SeqCst);
         self.pending.insert(id, tx);
@@ -129,18 +131,27 @@ impl TestServer {
         server_transport: (Rx<Request<TestRequest>>, Tx<Response<TestResponse>>),
         handler: impl TestService,
     ) {
-        let (mut req_rx, mut res_tx) = server_transport;
-        while let Some(req) = req_rx.recv().await {
-            let resp = match req.data {
-                TestRequest::say_hello((arg,)) => {
-                    let data = handler.say_hello(arg).await;
-                    Response {
-                        id: req.id,
-                        data: TestResponse::say_hello(data),
+        let (mut req_rx, res_tx) = server_transport;
+
+        futures::stream::unfold(req_rx, move |mut req_rx| async {
+            req_rx.recv().await.map(|req| (req, req_rx))
+        })
+        .for_each_concurrent(None, move |req| {
+            let res_tx = res_tx.clone();
+            let handler = handler.clone();
+            async move {
+                let resp = match req.data {
+                    TestRequest::say_hello((arg,)) => {
+                        let data = handler.say_hello(arg).await;
+                        Response {
+                            id: req.id,
+                            data: TestResponse::say_hello(data),
+                        }
                     }
-                }
-            };
-            res_tx.send(resp);
-        }
+                };
+                res_tx.send(resp);
+            }
+        })
+        .await;
     }
 }
