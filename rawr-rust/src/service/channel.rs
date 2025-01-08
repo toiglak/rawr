@@ -11,7 +11,7 @@ pub fn transport<Req, Res>() -> ((Tx<Req>, Rx<Res>), (Rx<Req>, Tx<Res>)) {
     ((Tx(req_tx), Rx(res_rx)), (Rx(req_rx), Tx(res_tx)))
 }
 
-pub struct Tx<T>(UnboundedSender<T>);
+pub struct Tx<T>(pub UnboundedSender<T>);
 
 impl<T> Tx<T> {
     pub fn send(&self, message: T) {
@@ -25,7 +25,7 @@ impl<T> Clone for Tx<T> {
     }
 }
 
-pub struct Rx<T>(UnboundedReceiver<T>);
+pub struct Rx<T>(pub UnboundedReceiver<T>);
 
 impl<T> Rx<T> {
     pub fn try_recv(&mut self) -> Option<T> {

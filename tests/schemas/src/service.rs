@@ -1,7 +1,4 @@
-use rawr::{
-    futures::{self, StreamExt},
-    AbstractClient, ClientTransport, Request, Response, ServerTransport,
-};
+use rawr::{AbstractClient, AbstractServer, ClientTransport, ServerTransport};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
@@ -94,33 +91,21 @@ impl TestServer {
     /// let response = client.say_hello("World".to_string()).await;
     /// println!("{}", response);
     /// ```
-    pub async fn new(
+    pub fn new(
         server_transport: ServerTransport<TestRequest, TestResponse>,
-        handler: impl TestService,
-    ) {
-        let (req_rx, res_tx) = server_transport;
-
-        let requests = futures::stream::unfold(req_rx, move |mut req_rx| async {
-            req_rx.recv().await.map(|req| (req, req_rx))
-        });
-
-        let process_request = move |req: Request<TestRequest>| {
-            let res_tx = res_tx.clone();
-            let handler = handler.clone();
+        service_handler: impl TestService,
+    ) -> impl Future<Output = ()> {
+        let handle_request = move |req: TestRequest| {
+            let handler = service_handler.clone();
             async move {
-                let resp = match req.data {
+                match req {
                     TestRequest::say_hello((arg0,)) => {
                         let data = handler.say_hello(arg0).await;
-                        Response {
-                            id: req.id,
-                            data: TestResponse::say_hello(data),
-                        }
+                        TestResponse::say_hello(data)
                     }
-                };
-                res_tx.send(resp);
+                }
             }
         };
-
-        requests.for_each_concurrent(None, process_request).await;
+        AbstractServer::new(server_transport, handle_request)
     }
 }

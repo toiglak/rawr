@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use futures::channel::oneshot;
+use futures::{channel::oneshot, StreamExt};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -64,7 +64,7 @@ impl<Req, Res> AbstractClient<Req, Res> {
             res_map: res_map.clone(),
         };
 
-        (client, handle_responses(res_rx, res_map))
+        (client, dispatch_server_responses(res_rx, res_map))
     }
 
     pub async fn make_request(&self, data: Req) -> Res {
@@ -90,7 +90,7 @@ impl<Req, Res> Clone for AbstractClient<Req, Res> {
     }
 }
 
-async fn handle_responses<ResData>(
+async fn dispatch_server_responses<ResData>(
     mut res_rx: Rx<Response<ResData>>,
     req_map: Arc<DashMap<u32, oneshot::Sender<Response<ResData>>>>,
 ) {
@@ -100,6 +100,32 @@ async fn handle_responses<ResData>(
         } else {
             // log::trace!("Received response with unknown id: {}", resp.id);
         }
+    }
+}
+
+pub struct AbstractServer;
+
+impl AbstractServer {
+    pub async fn new<Req, Res, H, F>(server_transport: ServerTransport<Req, Res>, handle_request: H)
+    where
+        // handle_request: impl AsyncFn(Request<Req>) -> Response<Res>
+        H: Fn(Req) -> F + Clone,
+        F: Future<Output = Res>,
+    {
+        let (req_rx, res_tx) = server_transport;
+        let handle_request = |req: Request<Req>| {
+            let res_tx = res_tx.clone();
+            let handle_request = handle_request.clone();
+            async move {
+                let response = handle_request(req.data).await;
+                let resp = Response {
+                    id: req.id,
+                    data: response,
+                };
+                res_tx.send(resp);
+            }
+        };
+        req_rx.0.for_each_concurrent(None, handle_request).await;
     }
 }
 
