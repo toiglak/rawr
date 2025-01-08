@@ -9,7 +9,6 @@ struct ServiceImpl {}
 
 impl TestService for ServiceImpl {
     async fn say_hello(&self, arg: String) -> String {
-        // tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         format!("Hello, {}!", arg)
     }
 }
@@ -26,7 +25,8 @@ async fn main() {
     while let Ok((stream, _)) = listener.accept().await {
         let ws_stream = accept_async(stream).await.expect("Failed to accept");
         let (mut write, mut read) = ws_stream.split();
-        let (req_tx, res_rx) = &mut client_transport; // todo: you should probably multiplex here
+        // TODO: You should probably multiplex here, handle multiple clients concurrently.
+        let (req_tx, res_rx) = &mut client_transport;
 
         let handle_incoming = async {
             while let Some(msg) = read.next().await {
