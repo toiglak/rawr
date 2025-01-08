@@ -44,7 +44,7 @@ async fn main() {
     let client = &client;
     let make_request = |i| async move {
         let response = client.say_hello(format!("World {}", i + 1)).await;
-        println!("{}: {}", i + 1, response);
+        assert_eq!(response, format!("Hello, World {}!", i + 1));
     };
     stream::iter(0..10)
         .for_each_concurrent(None, make_request)
