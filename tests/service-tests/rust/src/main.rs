@@ -1,3 +1,5 @@
+//! TODO: This should probably be in /examples.
+
 use futures::stream::{self, StreamExt};
 use schemas::service::{TestClient, TestServer, TestService};
 use tokio::time::{self, Duration};
