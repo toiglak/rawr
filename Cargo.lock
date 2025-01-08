@@ -580,6 +580,7 @@ dependencies = [
  "dashmap",
  "futures",
  "rawr_macros",
+ "serde",
  "thiserror",
 ]
 
@@ -636,6 +637,7 @@ name = "rust_client"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "rawr",
  "schemas",
  "serde_json",
  "tokio",

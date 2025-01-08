@@ -10,6 +10,8 @@ pub trait TestService: Clone + 'static + Send + Sync {
     async fn say_hello(&self, arg: String) -> String;
 }
 
+///////////// GENERATED CODE /////////////
+
 #[allow(non_camel_case_types)]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "method", content = "payload")]

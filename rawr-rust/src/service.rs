@@ -5,6 +5,7 @@ use std::{
 };
 
 use futures::channel::oneshot;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::dashmap::DashMap;
@@ -27,6 +28,7 @@ pub enum TransportError {
     Closed,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Request<P> {
     /// Unique identifier used to send the response back to the correct caller
     /// when multiple calls to the same method were made.
@@ -35,6 +37,7 @@ pub struct Request<P> {
     pub data: P,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Response<P> {
     /// Unique identifier used to send the response back to the correct caller
     /// when multiple calls to the same method were made.

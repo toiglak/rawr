@@ -8,3 +8,4 @@ rawr_macros = { path = "macros" }
 dashmap.workspace = true
 futures.workspace = true
 thiserror.workspace = true
+serde.workspace = true
