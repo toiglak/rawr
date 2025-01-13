@@ -1,10 +1,6 @@
 import { TestClient, TestServer } from "./generated";
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function runTest() {
+async function main() {
   const handle_request = TestServer({
     async say_hello(arg) {
       await sleep(Math.floor(Math.random() * 1000));
@@ -22,4 +18,8 @@ async function runTest() {
   }
 }
 
-runTest();
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+main();
