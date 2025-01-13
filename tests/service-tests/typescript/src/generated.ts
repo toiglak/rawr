@@ -1,7 +1,6 @@
 import type { MakeRequest } from "rawr";
 
 export type TestRequest = { method: "say_hello"; payload: [string] };
-
 export type TestResponse = { method: "say_hello"; payload: string };
 
 /**
@@ -15,13 +14,19 @@ export type TestResponse = { method: "say_hello"; payload: string };
  * const result = await ws_client.rpc_call();
  * ```
  */
-export function TestClient(make_request: MakeRequest) {
+export function TestClient(
+  make_request: MakeRequest<TestRequest, TestResponse>
+) {
   return {
     async say_hello(arg: string): Promise<string> {
-      return await make_request({
-        method: "say_hello",
-        payload: [arg],
+      const res = await make_request({
+        id: 0,
+        data: {
+          method: "say_hello",
+          payload: [arg],
+        },
       });
+      return res.data.payload;
     },
   };
 }
@@ -39,14 +44,16 @@ export type TestService = {
  */
 export function TestServer(
   service: TestService
-): (request: TestRequest) => Promise<TestResponse> {
-  return async (request: TestRequest) => {
-    switch (request.method) {
+): MakeRequest<TestRequest, TestResponse> {
+  return async (request) => {
+    switch (request.data.method) {
       case "say_hello":
         return {
-          method: "say_hello",
-          // This handles both sync and async service methods.
-          payload: await Promise.resolve(service.say_hello(request.payload[0])),
+          id: request.id,
+          data: {
+            method: "say_hello",
+            payload: await service.say_hello(request.data.payload[0]),
+          },
         };
     }
   };
