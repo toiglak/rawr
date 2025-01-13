@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "workspaces": [
+    "rawr-typescript",
+    "tests/service-tests/typescript",
+    "tests/service-tests/typescript-client",
+    "tests/service-tests/typescript-server"
+  ]
+}

@@ -1,7 +1,8 @@
 {
   "name": "typescript-server",
-  "module": "src/index.ts",
+  "private": true,
   "type": "module",
+  "module": "src/index.ts",
   "scripts": {
     "test": "bun src/index.ts"
   },

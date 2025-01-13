@@ -1,10 +1,13 @@
 {
-  "name": "typescript-client",
+  "name": "typescript-in-process",
   "private": true,
   "type": "module",
   "module": "src/index.ts",
   "scripts": {
     "test": "bun src/index.ts"
+  },
+  "dependencies": {
+    "rawr": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest"

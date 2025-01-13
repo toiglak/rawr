@@ -1,0 +1,15 @@
+{
+  "name": "rawr",
+  "type": "module",
+  "main": "src/lib.ts",
+  "module": "src/lib.ts",
+  "version": "0.0.0",
+  "scripts": {},
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {}
+}
