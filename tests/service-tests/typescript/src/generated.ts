@@ -1,4 +1,4 @@
-import type { MakeRequest } from "rawr";
+import type { HandleRequest } from "rawr";
 
 export type TestRequest = { method: "say_hello"; payload: [string] };
 export type TestResponse = { method: "say_hello"; payload: string };
@@ -15,17 +15,22 @@ export type TestResponse = { method: "say_hello"; payload: string };
  * ```
  */
 export function TestClient(
-  make_request: MakeRequest<TestRequest, TestResponse>
+  make_request: HandleRequest<TestRequest, TestResponse>
 ) {
+  let counter = 0;
+
   return {
     async say_hello(arg: string): Promise<string> {
       const res = await make_request({
-        id: 0,
+        id: counter++,
         data: {
           method: "say_hello",
           payload: [arg],
         },
       });
+      if (res.data.method !== "say_hello") {
+        throw new Error("Unexpected method: " + res.data.method);
+      }
       return res.data.payload;
     },
   };
@@ -44,7 +49,7 @@ export type TestService = {
  */
 export function TestServer(
   service: TestService
-): MakeRequest<TestRequest, TestResponse> {
+): HandleRequest<TestRequest, TestResponse> {
   return async (request) => {
     switch (request.data.method) {
       case "say_hello":

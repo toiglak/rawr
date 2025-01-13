@@ -5,8 +5,6 @@ function sleep(ms: number) {
 }
 
 async function runTest() {
-  let counter = 0;
-
   const handle_request = TestServer({
     async say_hello(arg) {
       await sleep(Math.floor(Math.random() * 1000));
@@ -16,11 +14,10 @@ async function runTest() {
 
   const client = TestClient(handle_request);
 
-  // Currently fails:
-  // Test ordering (req should match res).
+  // Test ordering (req number should match res number).
   for (let i = 0; i < 10; i++) {
     client.say_hello("World " + i).then((res) => {
-      console.log(`[${counter++}] ${res}`);
+      console.log(`[${i++}] ${res}`);
     });
   }
 }

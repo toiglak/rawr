@@ -10,6 +10,6 @@ export interface RawrResponse<Res> {
   data: Res;
 }
 
-export type MakeRequest<Req, Res> = (
+export type HandleRequest<Req, Res> = (
   data: RawrRequest<Req>
 ) => Promise<RawrResponse<Res>>;
