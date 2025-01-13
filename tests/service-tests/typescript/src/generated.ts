@@ -1,59 +1,53 @@
-// import type { Params } from "./plugin.ts";
+import type { MakeRequest } from "rawr";
 
-// import type { Preset } from "./common.ts";
-// import type { MakeRequest } from "ezbuf";
+export type TestRequest = { method: "say_hello"; payload: [string] };
 
-// export type EditorMessage =
-//   | { tag: "SetPreset"; content: Preset }
-//   | { tag: "SetParams"; content: Params }
-//   | { tag: "SetDaemonPorts"; content: DaemonPorts };
+export type TestResponse = { method: "say_hello"; payload: string };
 
-// export interface DaemonPorts {
-//   rpc_port: number;
-//   socketio_port: number;
-// }
+/**
+ * This function should be supplied to the specific protocol implementation.
+ *
+ * For example, using WebSocket:
+ *
+ * ```ts
+ * import { connect_ws } from "ezbuf";
+ * const ws_client = connect_ws("ws://127.0.0.1:727", TestClient);
+ * const result = await ws_client.rpc_call();
+ * ```
+ */
+export function TestClient(make_request: MakeRequest) {
+  return {
+    async say_hello(arg: string): Promise<string> {
+      return await make_request({
+        method: "say_hello",
+        payload: [arg],
+      });
+    },
+  };
+}
 
-// export type EditorRequest = {
-//   method: "push_toast";
-//   payload: [string, string, string];
-// };
+export type TestService = {
+  // string | Promise<string> is used to allow user to use async or sync functions.
+  say_hello: (arg: string) => string | Promise<string>;
+};
 
-// /**
-//  * This function should be supplied to the specific protocol implementation.
-//  *
-//  * For example, using WebSocket:
-//  *
-//  * ```ts
-//  * import { connect_ws } from "ezbuf";
-//  * const ws_client = connect_ws("ws://127.0.0.1:727", EditorClient);
-//  * const result = await ws_client.rpc_call();
-//  * ```
-//  */
-// export function EditorClient(make_request: MakeRequest) {
-//   return {
-//     push_toast(title: string, body: string, level: string): Promise<void> {
-//       let request: EditorRequest = {
-//         method: "push_toast",
-//         payload: [title, body, level],
-//       };
-//       return make_request(request);
-//     },
-//   };
-// }
-
-// /**
-//  * Handles editor requests by delegating to the appropriate service method.
-//  *
-//  * @param service - An instance of the Editor service.
-//  * @returns A function that you should call when handling a client request.
-//  */
-// export function EditorServer(
-//   service: ReturnType<typeof EditorClient>
-// ): (request: EditorRequest) => Promise<any> {
-//   return async (request: EditorRequest) => {
-//     switch (request.method) {
-//       case "push_toast":
-//         return await service.push_toast(...request.payload);
-//     }
-//   };
-// }
+/**
+ * Handles test requests by delegating to the appropriate service method.
+ *
+ * @param service - An instance of the Test service.
+ * @returns A function that you should call when handling a client request.
+ */
+export function TestServer(
+  service: TestService
+): (request: TestRequest) => Promise<TestResponse> {
+  return async (request: TestRequest) => {
+    switch (request.method) {
+      case "say_hello":
+        return {
+          method: "say_hello",
+          // This handles both sync and async service methods.
+          payload: await Promise.resolve(service.say_hello(request.payload[0])),
+        };
+    }
+  };
+}
