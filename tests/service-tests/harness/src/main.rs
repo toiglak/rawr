@@ -68,9 +68,9 @@ async fn async_main() -> Result<()> {
     };
 
     let rust_server = start_server(rust_server).await?;
-    let _ts_server = start_server(ts_server).await?;
+    let ts_server = start_server(ts_server).await?;
 
-    let servers = [&rust_server /* , &ts_server */];
+    let servers = [&rust_server , &ts_server];
 
     // Wait for the servers to start.
     // TODO: We could wait for servers to print "READY" to stdout instead.

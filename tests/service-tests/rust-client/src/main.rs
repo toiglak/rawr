@@ -1,6 +1,6 @@
 use futures::{future, stream, SinkExt, StreamExt};
 use schemas::service::{TestClient, TestResponse, TestService};
-use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
+use tokio_tungstenite::{connect_async, tungstenite::{error::ProtocolError, protocol::Message, Error}};
 
 #[tokio::main]
 async fn main() {
@@ -23,7 +23,11 @@ async fn main() {
 
         let handle_incoming = async {
             while let Some(msg) = inc.next().await {
-                let msg = msg.unwrap();
+                let msg = match msg {
+                    Ok(Message::Close(_)) | Err(Error::Protocol(ProtocolError::ResetWithoutClosingHandshake)) => break,
+                    Ok(msg) => msg,
+                    Err(e) => panic!("{:?}", e)
+                };
                 let msg: rawr::Response<TestResponse> =
                     serde_json::from_str(&msg.to_string()).unwrap();
                 res_tx.send(msg);
