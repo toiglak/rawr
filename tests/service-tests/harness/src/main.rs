@@ -84,7 +84,7 @@ async fn async_main() -> Result<()> {
         run_cmd: vec!["cargo", "run", "--bin", "rust_client"],
         working_dir: ".",
     };
-    let _ts_client = ServiceConfig {
+    let ts_client = ServiceConfig {
         name: "TypeScript",
         build_cmd: None,
         run_cmd: vec!["bun", "src/index.ts"],
@@ -93,7 +93,7 @@ async fn async_main() -> Result<()> {
 
     for server in servers {
         run_client(&rust_client, server).await;
-        // run_client(&ts_client, server).await;
+        run_client(&ts_client, server).await;
     }
 
     Ok(())

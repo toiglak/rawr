@@ -23,3 +23,12 @@ function sleep(ms: number) {
 }
 
 main();
+
+// How would we handle id-s when we send over web sockets?
+
+// as server: we could simply spawn a promise for each request, allowing us to call
+// `handle_request`, thus we'd always have a matching response id
+
+// as client: we'd have to disambigue the responses, maybe by using a map of
+// promises because web socket responses are not guaranteed to arrive in order, and
+// because they come from "one place" (the socket)

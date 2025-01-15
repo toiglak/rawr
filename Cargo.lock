@@ -660,6 +660,7 @@ name = "rust_server"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "log",
  "rawr",
  "schemas",
  "serde_json",
