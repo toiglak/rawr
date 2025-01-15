@@ -7,7 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::env::set_var("RUST_LOG", "info");
     env_logger::init();
 
-    //// Propagate panics in the runtime to the main
+    //// Propagate panics from the runtime
 
     let rt = runtime::Builder::new_current_thread()
         .enable_all()
@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     rt.block_on(async {
         tokio::select! {
             _ = async_main() => {},
-            _ = rx.recv() => {},
+            _ = rx.recv() => tokio::time::sleep(std::time::Duration::from_secs_f32(0.3)).await,
         }
     });
 
