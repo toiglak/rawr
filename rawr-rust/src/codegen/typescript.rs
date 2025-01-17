@@ -188,16 +188,19 @@ impl Codegen {
 
     fn generate_enum_body(&self, enum_def: &EnumDef, body: &mut String) {
         body.push_str(&format!("export type {} =\n", enum_def.name));
+        let (tag, content) = match enum_def.representation {
+            crate::EnumRepresentation::Adjacent { tag, content } => (tag, content),
+        };
         for variant in enum_def.variants {
             match variant {
                 EnumVariant::Unit { name } => {
-                    body.push_str(&format!("  | {{ type: \"{}\" }}\n", name));
+                    body.push_str(&format!("  | {{ {tag}: \"{}\" }}\n", name));
                 }
                 EnumVariant::Tuple { name, fields } => {
                     if fields.len() == 1 {
                         let ts_type = self.map_schema_to_type(&fields[0]);
                         body.push_str(&format!(
-                            "  | {{ type: \"{}\"; data: {} }}\n",
+                            "  | {{ {tag}: \"{}\"; {content}: {} }}\n",
                             name, ts_type
                         ));
                     } else {
@@ -206,14 +209,14 @@ impl Codegen {
                             .map(|schema| self.map_schema_to_type(schema))
                             .collect();
                         body.push_str(&format!(
-                            "  | {{ type: \"{}\"; data: [{}] }}\n",
+                            "  | {{ {tag}: \"{}\"; {content}: [{}] }}\n",
                             name,
                             ts_types.join(", ")
                         ));
                     }
                 }
                 EnumVariant::Struct { name, fields } => {
-                    body.push_str(&format!("  | {{ type: \"{}\"; data: {{\n", name));
+                    body.push_str(&format!("  | {{ {tag}: \"{}\"; {content}: {{\n", name));
                     for field in *fields {
                         let ts_type = self.map_schema_to_type(&field.schema);
                         body.push_str(&format!("    {}: {};\n", field.name, ts_type));
