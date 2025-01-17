@@ -1,22 +1,9 @@
-use rawr::{FieldDef, Schema, SchemaDef, StructDef};
+use rawr::Schema;
 use serde::{Deserialize, Serialize};
 
 use crate::enumeration::EnumAdjacent;
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Schema)]
 pub struct NestedModuleStruct {
     pub value: EnumAdjacent,
-}
-
-impl Schema for NestedModuleStruct {
-    fn schema() -> SchemaDef {
-        SchemaDef::Struct(StructDef {
-            name: "NestedModuleStruct",
-            module_path: ::core::module_path!(),
-            fields: rawr::Fields::Named(&[FieldDef {
-                name: "value",
-                schema: <EnumAdjacent as Schema>::schema,
-            }]),
-        })
-    }
 }

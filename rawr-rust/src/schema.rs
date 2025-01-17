@@ -81,23 +81,21 @@ impl SchemaDef {
                     f(schema);
                 }
             }
-            SchemaDef::Struct(struct_def) => {
-                match struct_def.fields {
-                    Fields::Unit => {},
-                    Fields::Unnamed(fields) => {
-                        for field in fields {
-                            let schema = (field)();
-                            f(schema);
-                        }
-                    },
-                    Fields::Named(fields) => {
-                        for field in fields {
-                            let schema = (field.schema)();
-                            f(schema);
-                        }
-                    },
+            SchemaDef::Struct(struct_def) => match struct_def.fields {
+                Fields::Unit => {}
+                Fields::Unnamed(fields) => {
+                    for field in fields {
+                        let schema = (field)();
+                        f(schema);
+                    }
                 }
-            }
+                Fields::Named(fields) => {
+                    for field in fields {
+                        let schema = (field.schema)();
+                        f(schema);
+                    }
+                }
+            },
             SchemaDef::Enum(enum_def) => {
                 for variant in enum_def.variants {
                     match variant {
