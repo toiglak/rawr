@@ -20,7 +20,7 @@ impl Schema for Structure {
         SchemaDef::Struct(StructDef {
             name: "Structure",
             module_path: ::core::module_path!(),
-            fields: &[
+            fields: rawr::Fields::Named( &[
                 FieldDef {
                     name: "name",
                     schema: <String as Schema>::schema,
@@ -49,7 +49,7 @@ impl Schema for Structure {
                     name: "crate_dependency",
                     schema: <StructFromOtherCrate as Schema>::schema,
                 },
-            ],
+            ]),
         })
     }
 }

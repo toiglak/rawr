@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{EnumDef, EnumVariant, PrimitiveType, Schema, SchemaDef, SchemaFn, StructDef};
+use crate::{EnumDef, EnumVariant, Fields, PrimitiveType, Schema, SchemaDef, SchemaFn, StructDef};
 
 type StringCow = Cow<'static, str>;
 
@@ -160,12 +160,30 @@ impl Codegen {
     }
 
     fn generate_struct_body(&self, struct_def: &StructDef, body: &mut String) {
-        body.push_str(&format!("export type {} = {{\n", struct_def.name));
-        for field in struct_def.fields {
-            let ts_type = self.map_schema_to_type(&field.schema);
-            body.push_str(&format!("  {}: {};\n", field.name, ts_type));
+        match struct_def.fields {
+            Fields::Unit => {
+                body.push_str(&format!("export type {} = {{}};\n", struct_def.name));
+            }
+            Fields::Unnamed(ref fields) => {
+                let ts_types: Vec<StringCow> = fields
+                    .iter()
+                    .map(|schema| self.map_schema_to_type(schema))
+                    .collect();
+                body.push_str(&format!(
+                    "export type {} = [{}];\n",
+                    struct_def.name,
+                    ts_types.join(", ")
+                ));
+            }
+            Fields::Named(ref fields) => {
+                body.push_str(&format!("export type {} = {{\n", struct_def.name));
+                for field in *fields {
+                    let ts_type = self.map_schema_to_type(&field.schema);
+                    body.push_str(&format!("  {}: {};\n", field.name, ts_type));
+                }
+                body.push_str("};\n");
+            }
         }
-        body.push_str("};\n");
     }
 
     fn generate_enum_body(&self, enum_def: &EnumDef, body: &mut String) {

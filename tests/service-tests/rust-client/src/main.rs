@@ -1,5 +1,8 @@
 use futures::{future, stream, SinkExt, StreamExt};
-use schemas::{service::{TestClient, TestResponse, TestService}, structure::Structure};
+use schemas::{
+    service::{TestClient, TestResponse, TestService},
+    structure::Structure,
+};
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{error::ProtocolError, protocol::Message, Error},

@@ -82,9 +82,20 @@ impl SchemaDef {
                 }
             }
             SchemaDef::Struct(struct_def) => {
-                for field in struct_def.fields {
-                    let schema = (field.schema)();
-                    f(schema);
+                match struct_def.fields {
+                    Fields::Unit => {},
+                    Fields::Unnamed(fields) => {
+                        for field in fields {
+                            let schema = (field)();
+                            f(schema);
+                        }
+                    },
+                    Fields::Named(fields) => {
+                        for field in fields {
+                            let schema = (field.schema)();
+                            f(schema);
+                        }
+                    },
                 }
             }
             SchemaDef::Enum(enum_def) => {
@@ -186,16 +197,23 @@ impl_schema_for_tuples!(
 );
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct StructDef {
-    pub name: &'static str,
-    pub module_path: &'static str,
-    pub fields: &'static [FieldDef],
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FieldDef {
     pub name: &'static str,
     pub schema: SchemaFn,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct StructDef {
+    pub name: &'static str,
+    pub module_path: &'static str,
+    pub fields: Fields,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Fields {
+    Unit,
+    Unnamed(&'static [SchemaFn]),
+    Named(&'static [FieldDef]),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

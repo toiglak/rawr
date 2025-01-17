@@ -13,10 +13,10 @@ impl Schema for ImportedStruct {
         SchemaDef::Struct(StructDef {
             name: "ImportedStruct",
             module_path: ::core::module_path!(),
-            fields: &[FieldDef {
+            fields: rawr::Fields::Named(&[FieldDef {
                 name: "value",
                 schema: <String as Schema>::schema,
-            }],
+            }]),
         })
     }
 }

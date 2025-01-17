@@ -13,10 +13,10 @@ impl Schema for NestedModuleStruct {
         SchemaDef::Struct(StructDef {
             name: "NestedModuleStruct",
             module_path: ::core::module_path!(),
-            fields: &[FieldDef {
+            fields: rawr::Fields::Named(&[FieldDef {
                 name: "value",
                 schema: <EnumAdjacent as Schema>::schema,
-            }],
+            }]),
         })
     }
 }

@@ -11,10 +11,10 @@ impl Schema for StructFromOtherCrate {
         SchemaDef::Struct(StructDef {
             name: "StructFromOtherCrate",
             module_path: ::core::module_path!(),
-            fields: &[FieldDef {
+            fields: rawr::Fields::Named(&[FieldDef {
                 name: "value",
                 schema: <i32 as Schema>::schema,
-            }],
+            }]),
         })
     }
 }
