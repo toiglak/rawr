@@ -1,7 +1,10 @@
 //! TODO: This should probably be in /examples.
 
 use futures::stream::{self, StreamExt};
-use schemas::service::{TestClient, TestServer, TestService};
+use schemas::{
+    service::{TestClient, TestServer, TestService},
+    structure::Structure,
+};
 use tokio::time::{self, Duration};
 
 #[derive(Clone)]
@@ -14,6 +17,11 @@ impl TestService for ServiceImpl {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         format!("Hello, {}!", arg)
+    }
+
+    async fn complex(&self, mut input: Structure, n: i32) -> Structure {
+        input.count += n;
+        input
     }
 }
 
@@ -42,4 +50,6 @@ async fn main() {
     if let Err(_) = time::timeout(Duration::from_secs(2), make_requests).await {
         panic!("test took more than 1 second to complete");
     }
+
+    client.complex(Structure::default(), 42).await;
 }

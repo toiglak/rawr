@@ -1,11 +1,27 @@
 import WebSocket from "ws";
 import { deepEquals } from "bun";
-import { TestClient, type TestRequest, type TestResponse } from "./generated";
+import {
+  TestClient,
+  type TestRequest,
+  type TestResponse,
+} from "../../generated";
 import type { RawrRequest, RawrResponse } from "rawr";
+import type { Structure } from "../../typescript-bindings/schemas/structure";
 
 const addr = process.env.SERVER_ADDR;
 if (!addr) throw new Error("SERVER_ADDR not set");
 const url = `ws://${addr}`;
+
+// Follows Rust's Structure::default().
+const TEST_STRUCTURE: Structure = {
+  name: "",
+  count: 0,
+  is_active: false,
+  imported: { value: "" },
+  tuple: ["\0", { value: "" }],
+  nested_tuple: ["\0", [0, { value: { type: "VariantA" } }]],
+  crate_dependency: { value: 0 },
+};
 
 async function checkServer(url: string) {
   const ws = new WebSocket(url);
@@ -43,6 +59,10 @@ async function checkServer(url: string) {
     const res = await client.say_hello("World " + i);
     console.log(`[${i++}] ${res}`);
   }
+
+  const res = await client.complex(TEST_STRUCTURE, 42);
+  const expected = { ...TEST_STRUCTURE, count: 42 };
+  assert_eq(res, expected);
 
   ws.close();
 }

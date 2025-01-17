@@ -1,10 +1,15 @@
-import { TestClient, TestServer } from "./generated";
+import type { Structure } from "../../typescript-bindings/schemas/structure";
+import { TestClient, TestServer } from "../../generated";
 
 async function main() {
   const handle_request = TestServer({
-    async say_hello(arg) {
+    say_hello: async function (arg) {
       await sleep(Math.floor(Math.random() * 1000));
       return `Hello, ${arg}!`;
+    },
+    complex: function (arg: Structure, n: number) {
+      arg.count += n;
+      return arg;
     },
   });
 

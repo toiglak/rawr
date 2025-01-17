@@ -1,7 +1,12 @@
 import type { HandleRequest } from "rawr";
+import type { Structure } from "./typescript-bindings/schemas/structure";
 
-export type TestRequest = { method: "say_hello"; payload: [string] };
-export type TestResponse = { method: "say_hello"; payload: string };
+export type TestRequest =
+  | { method: "say_hello"; payload: [string] }
+  | { method: "complex"; payload: [Structure, number] };
+export type TestResponse =
+  | { method: "say_hello"; payload: string }
+  | { method: "complex"; payload: Structure };
 
 /**
  * This function should be supplied to the specific protocol implementation.
@@ -20,7 +25,7 @@ export function TestClient(
   let counter = 0;
 
   return {
-    async say_hello(arg: string): Promise<string> {
+    say_hello: async function (arg: string): Promise<string> {
       const res = await make_request({
         id: counter++,
         data: {
@@ -33,12 +38,26 @@ export function TestClient(
       }
       return res.data.payload;
     },
+    complex: async function (arg: Structure, n: number): Promise<Structure> {
+      const res = await make_request({
+        id: counter++,
+        data: {
+          method: "complex",
+          payload: [arg, n],
+        },
+      });
+      if (res.data.method !== "complex") {
+        throw new Error("Unexpected method: " + res.data.method);
+      }
+      return res.data.payload;
+    },
   };
 }
 
 export type TestService = {
   // string | Promise<string> is used to allow user to use async or sync functions.
   say_hello: (arg: string) => string | Promise<string>;
+  complex: (arg: Structure, n: number) => Structure | Promise<Structure>;
 };
 
 /**
@@ -58,6 +77,17 @@ export function TestServer(
           data: {
             method: "say_hello",
             payload: await service.say_hello(request.data.payload[0]),
+          },
+        };
+      case "complex":
+        return {
+          id: request.id,
+          data: {
+            method: "complex",
+            payload: await service.complex(
+              request.data.payload[0],
+              request.data.payload[1]
+            ),
           },
         };
     }

@@ -1,12 +1,21 @@
 import type { RawrRequest, RawrResponse } from "rawr";
-import { TestServer, type TestRequest, type TestResponse } from "./generated";
+import {
+  TestServer,
+  type TestRequest,
+  type TestResponse,
+} from "../../generated";
+import type { Structure } from "../../typescript-bindings/schemas/structure";
 
 const addr = process.env.SERVER_ADDR;
 const port = addr && parseInt(addr.split(":")[1]);
 
 const handle_request = TestServer({
-  async say_hello(arg) {
+  say_hello: function (arg) {
     return `Hello, ${arg}!`;
+  },
+  complex: function (arg: Structure, n: number) {
+    arg.count += n;
+    return arg;
   },
 });
 

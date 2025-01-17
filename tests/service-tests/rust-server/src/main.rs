@@ -1,5 +1,6 @@
 use futures::{future, SinkExt, StreamExt};
 use schemas::service::{TestRequest, TestServer, TestService};
+use schemas::structure::Structure;
 use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::error::ProtocolError;
@@ -12,6 +13,11 @@ struct ServiceImpl {}
 impl TestService for ServiceImpl {
     async fn say_hello(&self, arg: String) -> String {
         format!("Hello, {}!", arg)
+    }
+
+    async fn complex(&self, mut input: Structure, n: i32) -> Structure {
+        input.count += n;
+        input
     }
 }
 
@@ -33,9 +39,10 @@ async fn main() {
         let handle_incoming = Box::pin(async {
             while let Some(msg) = read.next().await {
                 let msg = match msg {
-                    Ok(Message::Close(_)) | Err(Error::Protocol(ProtocolError::ResetWithoutClosingHandshake)) => break,
+                    Ok(Message::Close(_))
+                    | Err(Error::Protocol(ProtocolError::ResetWithoutClosingHandshake)) => break,
                     Ok(msg) => msg,
-                    Err(e) => panic!("{:?}", e)
+                    Err(e) => panic!("{:?}", e),
                 };
                 let msg: rawr::Request<TestRequest> =
                     serde_json::from_str(&msg.to_string()).unwrap();

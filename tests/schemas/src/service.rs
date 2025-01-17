@@ -2,9 +2,13 @@ use rawr::{AbstractClient, AbstractServer, ClientTransport, ServerTransport};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
+use crate::structure::Structure;
+
 #[allow(async_fn_in_trait)]
 pub trait TestService: Clone + 'static + Send + Sync {
     async fn say_hello(&self, arg: String) -> String;
+    /// Service should increment `count` by `n`.
+    async fn complex(&self, input: Structure, n: i32) -> Structure;
 }
 
 ///////////// GENERATED CODE /////////////
@@ -13,6 +17,7 @@ pub trait TestService: Clone + 'static + Send + Sync {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "method", content = "payload")]
 pub enum TestRequest {
+    complex((Structure, i32)),
     say_hello((String,)),
 }
 
@@ -20,6 +25,7 @@ pub enum TestRequest {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "method", content = "payload")]
 pub enum TestResponse {
+    complex(Structure),
     say_hello(String),
 }
 
@@ -68,6 +74,11 @@ impl TestService for TestClient {
             panic!("Unexpected response")
         }
     }
+
+    async fn complex(&self, mut input: Structure, n: i32) -> Structure {
+        input.count += n;
+        input
+    }
 }
 
 pub struct TestServer;
@@ -102,6 +113,10 @@ impl TestServer {
                     TestRequest::say_hello((arg0,)) => {
                         let data = handler.say_hello(arg0).await;
                         TestResponse::say_hello(data)
+                    }
+                    TestRequest::complex((arg0, arg1)) => {
+                        let data = handler.complex(arg0, arg1).await;
+                        TestResponse::complex(data)
                     }
                 }
             }
