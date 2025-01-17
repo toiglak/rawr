@@ -4,6 +4,7 @@ members = [
     "rawr-rust",
     "tests/codegen-tests/harness",
     "tests/service-tests/harness",
+    "tests/service-tests/rust",
     "tests/service-tests/rust-client",
     "tests/service-tests/rust-server",
 ]
@@ -14,6 +15,7 @@ schemas = { path = "tests/schemas" }
 
 anyhow = "1.0.95"
 colored = "2.2.0"
+dashmap = "6.1.0"
 duct = "0.13.7"
 env_logger = "0.11.6"
 futures = "0.3"
@@ -21,6 +23,7 @@ glob = "0.3.2"
 log = "0.4.22"
 serde = "1.0.217"
 serde_json = "1.0.134"
+thiserror = "2.0.9"
 tokio = { version = "1.42", features = ["full"] }
 tokio-tungstenite = "0.26.1"
 walkdir = "2.5.0"

@@ -3,7 +3,9 @@ name = "rawr"
 version = "0.1.0"
 edition = "2021"
 
-
 [dependencies]
 rawr_macros = { path = "macros" }
-thiserror = "2.0.9"
+dashmap.workspace = true
+futures.workspace = true
+thiserror.workspace = true
+serde.workspace = true

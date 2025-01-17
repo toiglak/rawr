@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::panic;
 use tokio::process::Command;
 use tokio::runtime;
 
@@ -6,14 +7,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::env::set_var("RUST_LOG", "info");
     env_logger::init();
 
+    //// Propagate panics from the runtime
+
     let rt = runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
-    rt.block_on(async_main()).unwrap();
 
-    // NOTE: When the runtime is dropped here, it will also kill all the child
-    // processes because we have set `kill_on_drop(true)`. This is important, so
-    // that the servers are killed when the harness exits.
+    // Set a custom panic hook because Tokio catches panics instead of propagating them,
+    // preventing the runtime from being dropped. This hook ensures the runtime is dropped,
+    // cancelling all tasks and killing child processes when a panic occurs.
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
+
+    let prev_hook = panic::take_hook();
+    panic::set_hook(Box::new({
+        let tx = tx.clone();
+        move |info| {
+            tx.try_send(()).unwrap();
+            prev_hook(info);
+        }
+    }));
+
+    rt.block_on(async {
+        tokio::select! {
+            _ = async_main() => {},
+            _ = rx.recv() => tokio::time::sleep(std::time::Duration::from_secs_f32(0.3)).await,
+        }
+    });
+
+    // When the runtime is dropped here, it will also kill all the child processes
+    // because we have set `kill_on_drop(true)`. This ensures that the servers are
+    // terminated when the harness exits.
 
     Ok(())
 }
@@ -122,19 +145,20 @@ async fn start_server(cfg: ServiceConfig) -> Result<Server> {
             .env("SERVER_ADDR", &addr_)
             .kill_on_drop(true)
             .output()
-            .await
-            .unwrap();
+            .await;
 
-        if !output.status.success() {
-            log::error!(
-                "{name} server exited with status {}:\n{}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            );
-            panic!("{name} server exited with non-zero status");
+        if let Ok(output) = output {
+            if !output.status.success() {
+                log::error!(
+                    "{name} server exited with status {}:\n{}",
+                    output.status,
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                panic!("{name} server exited with non-zero status");
+            }
+
+            log::info!("{name} server exited successfully");
         }
-
-        log::info!("{name} server exited successfully");
     });
 
     Ok(Server { name, addr })

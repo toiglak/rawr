@@ -1,0 +1,17 @@
+procs:
+  rust-server:
+    cmd: ["cargo", "run", "--bin", "rust_server"]
+    env:
+      SERVER_ADDR: "127.0.0.1:5555"
+  typescript-server:
+    cmd: ["bun", "run", "./tests/service-tests/typescript-server"]
+    env:
+      SERVER_ADDR: "127.0.0.1:5555"
+  rust-client:
+    cmd: ["cargo", "run", "--bin", "rust_client"]
+    env:
+      SERVER_ADDR: "127.0.0.1:5555"
+  typescript-client:
+    cmd: ["bun", "run", "./tests/service-tests/typescript-client"]
+    env:
+      SERVER_ADDR: "127.0.0.1:5555"

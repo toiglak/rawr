@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "workspaces": [
+    "rawr-typescript",
+    "tests/service-tests/typescript",
+    "tests/service-tests/typescript-client",
+    "tests/service-tests/typescript-server"
+  ],
+  "scripts": {
+    "dev": "mprocs"
+  },
+  "devDependencies": {
+    "mprocs": "0.7.1"
+  }
+}

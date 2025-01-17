@@ -1,32 +1,62 @@
-use futures::{SinkExt, StreamExt};
+use futures::{future, SinkExt, StreamExt};
+use schemas::service::{TestRequest, TestServer, TestService};
+use schemas::structure::Structure;
 use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
+use tokio_tungstenite::tungstenite::error::ProtocolError;
 use tokio_tungstenite::tungstenite::protocol::Message;
+use tokio_tungstenite::tungstenite::Error;
 
-type TestStruct = schemas::structure::Structure;
+#[derive(Clone)]
+struct ServiceImpl {}
+
+impl TestService for ServiceImpl {
+    async fn say_hello(&self, arg: String) -> String {
+        format!("Hello, {}!", arg)
+    }
+
+    async fn complex(&self, mut input: Structure, n: i32) -> Structure {
+        input.count += n;
+        input
+    }
+}
 
 #[tokio::main]
 async fn main() {
     let addr = std::env::var("SERVER_ADDR").expect("SERVER_ADDR not set");
     let listener = TcpListener::bind(addr).await.expect("Failed to bind");
 
+    let (mut client_transport, server_transport) = rawr::transport();
+    let server_task = TestServer::new(server_transport, ServiceImpl {});
+    tokio::spawn(server_task);
+
     while let Ok((stream, _)) = listener.accept().await {
         let ws_stream = accept_async(stream).await.expect("Failed to accept");
         let (mut write, mut read) = ws_stream.split();
+        // TODO: You should probably multiplex here, handle multiple clients concurrently.
+        let (req_tx, res_rx) = &mut client_transport;
 
-        while let Some(Ok(message)) = read.next().await {
-            if message.is_close() {
-                break;
+        let handle_incoming = Box::pin(async {
+            while let Some(msg) = read.next().await {
+                let msg = match msg {
+                    Ok(Message::Close(_))
+                    | Err(Error::Protocol(ProtocolError::ResetWithoutClosingHandshake)) => break,
+                    Ok(msg) => msg,
+                    Err(e) => panic!("{:?}", e),
+                };
+                let msg: rawr::Request<TestRequest> =
+                    serde_json::from_str(&msg.to_string()).unwrap();
+                req_tx.send(msg);
             }
+        });
 
-            // Deserialize Structure from the client.
-            let message = message.to_text().unwrap();
-            let message: TestStruct = serde_json::from_str(message).unwrap();
-            assert_eq!(message, TestStruct::default());
+        let handle_outgoing = Box::pin(async {
+            while let Some(res) = res_rx.recv().await {
+                let res = Message::text(serde_json::to_string(&res).unwrap());
+                write.send(res).await.unwrap();
+            }
+        });
 
-            // Serialize Structure and send it back to the client.
-            let message = serde_json::to_string(&message).unwrap();
-            write.send(Message::text(message)).await.unwrap();
-        }
+        future::select(handle_incoming, handle_outgoing).await;
     }
 }

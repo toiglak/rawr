@@ -1,5 +1,5 @@
 [package]
-name = "rust_client"
+name = "rust_inprocess_service_tests"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,4 +10,3 @@ schemas = { workspace = true }
 futures = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-tokio-tungstenite = { workspace = true }
