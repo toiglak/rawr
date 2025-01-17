@@ -75,9 +75,17 @@ impl TestService for TestClient {
         }
     }
 
-    async fn complex(&self, mut input: Structure, n: i32) -> Structure {
-        input.count += n;
-        input
+    async fn complex(&self, arg0: Structure, arg1: i32) -> Structure {
+        let req = TestRequest::complex((arg0, arg1));
+        let res = self.inner.make_request(req).await;
+
+        #[allow(irrefutable_let_patterns)]
+        if let TestResponse::complex(ret) = res {
+            ret
+        } else {
+            // Perhaps this should return an error instead of panicking?
+            panic!("Unexpected response")
+        }
     }
 }
 
