@@ -9,4 +9,5 @@ export type Structure = {
   tuple: [string, ImportedStruct];
   nested_tuple: [string, [number, NestedModuleStruct]];
   crate_dependency: StructFromOtherCrate;
+  array_like: [string[], number[], number[][]];
 };

@@ -11,6 +11,7 @@ pub trait Schema {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SchemaDef {
     Primitive(PrimitiveType),
+    Array(SchemaFn),
     Tuple(&'static [SchemaFn]),
     Struct(StructDef),
     Enum(EnumDef),
@@ -57,6 +58,7 @@ impl SchemaDef {
                 PrimitiveType::Char => "char",
                 PrimitiveType::String => "String",
             }),
+            SchemaDef::Array(_) => None,
             SchemaDef::Tuple(_) => None,
             SchemaDef::Struct(def) => Some(def.name),
             SchemaDef::Enum(def) => Some(def.name),
@@ -66,6 +68,7 @@ impl SchemaDef {
     pub fn module_path(&self) -> Option<&'static str> {
         match self {
             SchemaDef::Primitive(_) => None,
+            SchemaDef::Array(_) => None,
             SchemaDef::Tuple(_) => None,
             SchemaDef::Struct(def) => Some(def.module_path),
             SchemaDef::Enum(def) => Some(def.module_path),
@@ -75,6 +78,9 @@ impl SchemaDef {
     pub fn visit_dependencies(&self, mut f: impl FnMut(SchemaDef)) {
         match self {
             SchemaDef::Primitive(_) => {}
+            SchemaDef::Array(schema) => {
+                f(schema());
+            }
             SchemaDef::Tuple(fields) => {
                 for schema_fn in *fields {
                     let schema = schema_fn();
@@ -118,6 +124,8 @@ impl SchemaDef {
         }
     }
 }
+
+//// Primitives
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum PrimitiveType {
@@ -164,6 +172,40 @@ impl_schema_for_primitive!(
   char => Char
 );
 
+//// Array-like
+
+impl<T: Schema> Schema for Vec<T> {
+    fn schema() -> SchemaDef {
+        SchemaDef::Array(T::schema)
+    }
+}
+
+impl<T: Schema> Schema for [T] {
+    fn schema() -> SchemaDef {
+        SchemaDef::Array(T::schema)
+    }
+}
+
+impl<T: Schema> Schema for &[T] {
+    fn schema() -> SchemaDef {
+        SchemaDef::Array(T::schema)
+    }
+}
+
+impl<T: Schema> Schema for &mut [T] {
+    fn schema() -> SchemaDef {
+        SchemaDef::Array(T::schema)
+    }
+}
+
+impl<const N: usize, T: Schema> Schema for [T; N] {
+    fn schema() -> SchemaDef {
+        SchemaDef::Array(T::schema)
+    }
+}
+
+//// Tuples
+
 macro_rules! impl_schema_for_tuples {
     ($(($($name:ident),+)),+) => {
         $(
@@ -194,11 +236,7 @@ impl_schema_for_tuples!(
     (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P)
 );
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct FieldDef {
-    pub name: &'static str,
-    pub schema: SchemaFn,
-}
+//// Structs
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct StructDef {
@@ -213,6 +251,14 @@ pub enum Fields {
     Unnamed(&'static [SchemaFn]),
     Named(&'static [FieldDef]),
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct FieldDef {
+    pub name: &'static str,
+    pub schema: SchemaFn,
+}
+
+//// Enums
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EnumDef {

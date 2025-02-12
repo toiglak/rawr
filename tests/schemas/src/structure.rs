@@ -13,4 +13,5 @@ pub struct Structure {
     pub tuple: (char, ImportedStruct),
     pub nested_tuple: (char, (i32, NestedModuleStruct)),
     pub crate_dependency: StructFromOtherCrate,
+    pub array_like: (Vec<String>, [i32; 3], Vec<Vec<u32>>),
 }
