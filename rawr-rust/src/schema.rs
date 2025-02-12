@@ -34,8 +34,9 @@ impl SchemaDef {
         matches!(self, SchemaDef::Enum(_))
     }
 
-    pub fn as_tuple(&self) -> Option<&'static [SchemaFn]> {
+    pub fn get_fields(&self) -> Option<&[SchemaFn]> {
         match self {
+            SchemaDef::Array(schema) => Some(std::slice::from_ref(schema)),
             SchemaDef::Tuple(fields) => Some(fields),
             _ => None,
         }

@@ -103,8 +103,8 @@ impl Codegen {
         let mut dependencies = BTreeSet::new();
 
         fn visit(dependencies: &mut BTreeSet<SchemaDef>, dep: SchemaDef, module_path: &&str) {
-            // In case the dependent type is a tuple, visit all its fields
-            if let Some(fields) = dep.as_tuple() {
+            // In case the dependent contains other types, visit them as well
+            if let Some(fields) = dep.get_fields() {
                 for field in fields {
                     visit(dependencies, field(), module_path);
                 }

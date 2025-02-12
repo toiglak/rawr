@@ -2,7 +2,10 @@ use rawr::Schema;
 use schemas_subcrate::StructFromOtherCrate;
 use serde::{Deserialize, Serialize};
 
-use crate::module::{nested_module::NestedModuleStruct, ImportedStruct};
+use crate::{
+    array_like::ArrayLike,
+    module::{nested_module::NestedModuleStruct, ImportedStruct},
+};
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Schema)]
 pub struct Structure {
@@ -13,5 +16,5 @@ pub struct Structure {
     pub tuple: (char, ImportedStruct),
     pub nested_tuple: (char, (i32, NestedModuleStruct)),
     pub crate_dependency: StructFromOtherCrate,
-    pub array_like: (Vec<String>, [i32; 3], Vec<Vec<u32>>),
+    pub array_like: ArrayLike,
 }
