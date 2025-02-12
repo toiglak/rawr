@@ -23,6 +23,9 @@ impl TestService for ServiceImpl {
 
 #[tokio::main]
 async fn main() {
+    std::env::set_var("RUST_LOG", "debug");
+    env_logger::init();
+
     let addr = std::env::var("SERVER_ADDR").expect("SERVER_ADDR not set");
     let listener = TcpListener::bind(addr).await.expect("Failed to bind");
 
@@ -44,6 +47,7 @@ async fn main() {
                     Ok(msg) => msg,
                     Err(e) => panic!("{:?}", e),
                 };
+                log::debug!("Received message: {}", msg);
                 let msg: rawr::Request<TestRequest> =
                     serde_json::from_str(&msg.to_string()).unwrap();
                 req_tx.send(msg);
@@ -53,6 +57,7 @@ async fn main() {
         let handle_outgoing = Box::pin(async {
             while let Some(res) = res_rx.recv().await {
                 let res = Message::text(serde_json::to_string(&res).unwrap());
+                log::debug!("Sending message: {}", res);
                 write.send(res).await.unwrap();
             }
         });

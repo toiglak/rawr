@@ -3,7 +3,7 @@ use schemas_subcrate::StructFromOtherCrate;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    array_like::ArrayLike,
+    array_like::{ArrayLike, TupleStruct},
     module::{nested_module::NestedModuleStruct, ImportedStruct},
 };
 
@@ -17,4 +17,5 @@ pub struct Structure {
     pub nested_tuple: (char, (i32, NestedModuleStruct)),
     pub crate_dependency: StructFromOtherCrate,
     pub array_like: ArrayLike,
+    pub tuple_struct: TupleStruct,
 }

@@ -240,6 +240,10 @@ impl_schema_for_tuples!(
 
 //// Structs
 
+// FIXME: Structs are much more involved in serde than this. I made some wrong
+// assumptions here. For example, there is unit struct (serialized as null, not
+// {}), there is newtype struct (which is serialized as the inner value), etc.
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct StructDef {
     pub name: &'static str,

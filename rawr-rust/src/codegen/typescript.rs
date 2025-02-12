@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::{BTreeSet, HashMap}, // Replaced HashSet with BTreeSet
+    collections::{BTreeSet, HashMap},
     fs,
     path::{Path, PathBuf},
 };
@@ -19,13 +19,13 @@ pub struct Codegen {
     // consider sorting beforehand by `name`, etc.
     schemas: BTreeSet<SchemaDef>,
 
-    output_path: String,
+    output_path: PathBuf,
 }
 
 impl Codegen {
     pub fn new() -> Self {
         Codegen {
-            output_path: String::new(),
+            output_path: PathBuf::new(),
             schemas: BTreeSet::new(),
         }
     }
@@ -52,8 +52,8 @@ impl Codegen {
         schema.visit_dependencies(|dep| self.export_schema(dep));
     }
 
-    pub fn export_to(mut self, output_path: &str) -> Self {
-        self.output_path = output_path.to_string();
+    pub fn export_to(mut self, output_path: impl AsRef<Path>) -> Self {
+        self.output_path = output_path.as_ref().to_path_buf();
         self
     }
 
