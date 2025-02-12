@@ -102,18 +102,16 @@ impl Codegen {
 
         let mut dependencies = BTreeSet::new();
 
-        fn visit(dependencies: &mut BTreeSet<SchemaDef>, dep: SchemaDef, module_path: &&str) {
-            // In case the dependent contains other types, visit them as well
-            if let Some(fields) = dep.get_fields() {
-                for field in fields {
-                    visit(dependencies, field(), module_path);
-                }
+        fn visit(dependencies: &mut BTreeSet<SchemaDef>, def: SchemaDef, module_path: &&str) {
+            // If the type contains other types as part of its definition, visit them
+            for dep_def in def.get_generic_dependencies() {
+                visit(dependencies, dep_def(), module_path);
             }
 
-            // Add the type dependency if it's not in the same module
-            if let Some(schema_module) = dep.module_path() {
+            // If the type is not in the same module, add it as a dependency
+            if let Some(schema_module) = def.module_path() {
                 if *module_path != schema_module {
-                    dependencies.insert(dep);
+                    dependencies.insert(def);
                 }
             }
         }

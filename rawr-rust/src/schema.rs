@@ -34,11 +34,17 @@ impl SchemaDef {
         matches!(self, SchemaDef::Enum(_))
     }
 
-    pub fn get_fields(&self) -> Option<&[SchemaFn]> {
+    /// Returns type dependencies for the generic schemas.
+    ///
+    /// When a type includes generics, concrete instantiations of these generics
+    /// (e.g., `MyType` in `Option<MyType>`) must be imported at the point of use
+    /// in the generated binding file.
+    pub fn get_generic_dependencies(&self) -> &[SchemaFn] {
         match self {
-            SchemaDef::Array(schema) => Some(std::slice::from_ref(schema)),
-            SchemaDef::Tuple(fields) => Some(fields),
-            _ => None,
+            SchemaDef::Array(schema) => std::slice::from_ref(schema),
+            SchemaDef::Tuple(fields) => fields,
+            // TODO: Struct and Enum generics
+            _ => &[],
         }
     }
 
