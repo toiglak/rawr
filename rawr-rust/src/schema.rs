@@ -219,6 +219,7 @@ macro_rules! impl_schema_for_tuples {
 }
 
 impl_schema_for_tuples!(
+    (A),
     (A, B),
     (A, B, C),
     (A, B, C, D),
