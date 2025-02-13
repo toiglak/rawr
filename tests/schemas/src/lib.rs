@@ -1,8 +1,8 @@
 use rawr::codegen::typescript;
 
-pub mod array_like;
 pub mod enumeration;
 pub mod module;
+pub mod sequence;
 pub mod service;
 pub mod structure;
 

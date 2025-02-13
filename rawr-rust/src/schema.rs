@@ -13,27 +13,11 @@ pub enum SchemaDef {
     Primitive(PrimitiveType),
     Array(SchemaFn),
     Tuple(&'static [SchemaFn]),
-    Struct(StructDef),
     Enum(EnumDef),
+    Struct(StructDef),
 }
 
 impl SchemaDef {
-    pub fn is_primitive(&self) -> bool {
-        matches!(self, SchemaDef::Primitive(_))
-    }
-
-    pub fn is_tuple(&self) -> bool {
-        matches!(self, SchemaDef::Tuple(_))
-    }
-
-    pub fn is_struct(&self) -> bool {
-        matches!(self, SchemaDef::Struct(_))
-    }
-
-    pub fn is_enum(&self) -> bool {
-        matches!(self, SchemaDef::Enum(_))
-    }
-
     /// Returns type dependencies for the generic schemas.
     ///
     /// When a type includes generics, concrete instantiations of these generics
@@ -51,6 +35,7 @@ impl SchemaDef {
     pub fn name(&self) -> Option<&'static str> {
         match self {
             SchemaDef::Primitive(t) => Some(match t {
+                PrimitiveType::Unit => "()",
                 PrimitiveType::U8 => "u8",
                 PrimitiveType::U16 => "u16",
                 PrimitiveType::U32 => "u32",
@@ -82,50 +67,24 @@ impl SchemaDef {
         }
     }
 
-    pub fn visit_dependencies(&self, mut f: impl FnMut(SchemaDef)) {
+    pub fn visit_dependencies(&self, mut visit: impl FnMut(SchemaDef)) {
         match self {
             SchemaDef::Primitive(_) => {}
             SchemaDef::Array(schema) => {
-                f(schema());
+                visit(schema());
             }
             SchemaDef::Tuple(fields) => {
                 for schema_fn in *fields {
                     let schema = schema_fn();
-                    f(schema);
+                    visit(schema);
                 }
             }
-            SchemaDef::Struct(struct_def) => match struct_def.fields {
-                Fields::Unit => {}
-                Fields::Unnamed(fields) => {
-                    for field in fields {
-                        let schema = (field)();
-                        f(schema);
-                    }
-                }
-                Fields::Named(fields) => {
-                    for field in fields {
-                        let schema = (field.schema)();
-                        f(schema);
-                    }
-                }
-            },
+            SchemaDef::Struct(struct_def) => {
+                struct_def.shape.visit_dependencies(&mut visit);
+            }
             SchemaDef::Enum(enum_def) => {
                 for variant in enum_def.variants {
-                    match variant {
-                        EnumVariant::Unit { .. } => {}
-                        EnumVariant::Tuple { fields, .. } => {
-                            for schema_fn in *fields {
-                                let schema = schema_fn();
-                                f(schema);
-                            }
-                        }
-                        EnumVariant::Struct { fields, .. } => {
-                            for field in *fields {
-                                let schema = (field.schema)();
-                                f(schema);
-                            }
-                        }
-                    }
+                    variant.shape.visit_dependencies(&mut visit);
                 }
             }
         }
@@ -136,6 +95,7 @@ impl SchemaDef {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum PrimitiveType {
+    Unit,
     U8,
     U16,
     U32,
@@ -164,19 +124,20 @@ macro_rules! impl_schema_for_primitive {
 }
 
 impl_schema_for_primitive!(
-  String => String,
+  () => Unit,
+  i8 => I8,
+  i16 => I16,
   i32 => I32,
   i64 => I64,
   u8 => U8,
   u16 => U16,
   u32 => U32,
   u64 => U64,
-  i8 => I8,
-  i16 => I16,
   f32 => F32,
   f64 => F64,
   bool => Bool,
-  char => Char
+  char => Char,
+  String => String
 );
 
 //// Array-like
@@ -244,24 +205,83 @@ impl_schema_for_tuples!(
     (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P)
 );
 
-//// Structs
+////
 
-// FIXME: Structs are much more involved in serde than this. I made some wrong
-// assumptions here. For example, there is unit struct (serialized as null, not
-// {}), there is newtype struct (which is serialized as the inner value), etc.
+/// Represents the shape of a struct or enum variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Shape {
+    /// Represents a unit-like struct or enum variant.
+    ///
+    /// Example:
+    ///
+    /// ```
+    /// struct UnitStruct;
+    /// enum E { UnitVariant }
+    /// ```
+    Unit,
+    /// Represents a newtype-like struct or enum variant.
+    ///
+    /// Example:
+    ///
+    /// ```
+    /// struct NewtypeStruct(i32);
+    /// struct NewtypeStruct((i32, String));
+    /// enum E { NewtypeVariant(i32) }
+    /// enum E { NewtypeVariant((i32, String)) }
+    /// ```
+    Newtype(SchemaFn),
+    /// Represents a tuple-like struct or enum variant.
+    ///
+    /// Example:
+    ///
+    /// ```
+    /// struct TupleStruct();
+    /// struct TupleStruct(i32, String);
+    /// enum E { TupleVariant() }
+    /// enum E { TupleVariant(i32, String) }
+    /// ```
+    Tuple(&'static [SchemaFn]),
+    /// Represents a struct or enum variant with named fields.
+    ///
+    /// Example:
+    ///
+    /// ```
+    /// struct MapStruct { }
+    /// struct MapStruct { a: i32, b: String }
+    /// enum E { MapVariant { } }
+    /// enum E { MapVariant { a: i32, b: String } }
+    /// ```
+    Map(&'static [FieldDef]),
+}
+
+impl Shape {
+    fn visit_dependencies(&self, visit: &mut impl FnMut(SchemaDef)) {
+        match *self {
+            Shape::Unit => {}
+            Shape::Newtype(schema) => visit(schema()),
+            Shape::Tuple(fields) => {
+                for field in fields {
+                    let schema = (field)();
+                    visit(schema);
+                }
+            }
+            Shape::Map(fields) => {
+                for field in fields {
+                    let schema = (field.schema)();
+                    visit(schema);
+                }
+            }
+        }
+    }
+}
+
+//// Structs
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct StructDef {
     pub name: &'static str,
     pub module_path: &'static str,
-    pub fields: Fields,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum Fields {
-    Unit,
-    Unnamed(&'static [SchemaFn]),
-    Named(&'static [FieldDef]),
+    pub shape: Shape,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -276,29 +296,20 @@ pub struct FieldDef {
 pub struct EnumDef {
     pub name: &'static str,
     pub module_path: &'static str,
-    pub representation: EnumRepresentation,
-    pub variants: &'static [EnumVariant],
+    pub representation: EnumRepr,
+    pub variants: &'static [VariantDef],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum EnumRepresentation {
+pub struct VariantDef {
+    pub name: &'static str,
+    pub shape: Shape,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum EnumRepr {
     Adjacent {
         tag: &'static str,
         content: &'static str,
-    },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum EnumVariant {
-    Unit {
-        name: &'static str,
-    },
-    Tuple {
-        name: &'static str,
-        fields: &'static [SchemaFn],
-    },
-    Struct {
-        name: &'static str,
-        fields: &'static [FieldDef],
     },
 }

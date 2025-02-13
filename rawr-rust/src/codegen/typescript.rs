@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{EnumDef, EnumVariant, Fields, PrimitiveType, Schema, SchemaDef, SchemaFn, StructDef};
+use crate::{EnumDef, EnumRepr, PrimitiveType, Schema, SchemaDef, SchemaFn, Shape, StructDef};
 
 type StringCow = Cow<'static, str>;
 
@@ -158,11 +158,15 @@ impl Codegen {
     }
 
     fn generate_struct_body(&self, struct_def: &StructDef, body: &mut String) {
-        match struct_def.fields {
-            Fields::Unit => {
-                body.push_str(&format!("export type {} = {{}};\n", struct_def.name));
+        match struct_def.shape {
+            Shape::Unit => {
+                body.push_str(&format!("export type {} = null;\n", struct_def.name));
             }
-            Fields::Unnamed(ref fields) => {
+            Shape::Newtype(ref schema) => {
+                let ts_type = self.map_schema_to_type(schema);
+                body.push_str(&format!("export type {} = {};\n", struct_def.name, ts_type));
+            }
+            Shape::Tuple(ref fields) => {
                 let ts_types: Vec<StringCow> = fields
                     .iter()
                     .map(|schema| self.map_schema_to_type(schema))
@@ -173,7 +177,7 @@ impl Codegen {
                     ts_types.join(", ")
                 ));
             }
-            Fields::Named(ref fields) => {
+            Shape::Map(ref fields) => {
                 body.push_str(&format!("export type {} = {{\n", struct_def.name));
                 for field in *fields {
                     let ts_type = self.map_schema_to_type(&field.schema);
@@ -187,19 +191,26 @@ impl Codegen {
     fn generate_enum_body(&self, enum_def: &EnumDef, body: &mut String) {
         body.push_str(&format!("export type {} =\n", enum_def.name));
         let (tag, content) = match enum_def.representation {
-            crate::EnumRepresentation::Adjacent { tag, content } => (tag, content),
+            EnumRepr::Adjacent { tag, content } => (tag, content),
         };
         for variant in enum_def.variants {
-            match variant {
-                EnumVariant::Unit { name } => {
-                    body.push_str(&format!("  | {{ {tag}: \"{}\" }}\n", name));
+            match variant.shape {
+                Shape::Unit => {
+                    body.push_str(&format!("  | {{ {tag}: \"{}\" }}\n", variant.name));
                 }
-                EnumVariant::Tuple { name, fields } => {
+                Shape::Newtype(ref schema) => {
+                    let ts_type = self.map_schema_to_type(schema);
+                    body.push_str(&format!(
+                        "  | {{ {tag}: \"{}\"; {content}: {} }}\n",
+                        variant.name, ts_type
+                    ));
+                }
+                Shape::Tuple(ref fields) => {
                     if fields.len() == 1 {
                         let ts_type = self.map_schema_to_type(&fields[0]);
                         body.push_str(&format!(
                             "  | {{ {tag}: \"{}\"; {content}: {} }}\n",
-                            name, ts_type
+                            variant.name, ts_type
                         ));
                     } else {
                         let ts_types: Vec<StringCow> = fields
@@ -208,13 +219,16 @@ impl Codegen {
                             .collect();
                         body.push_str(&format!(
                             "  | {{ {tag}: \"{}\"; {content}: [{}] }}\n",
-                            name,
+                            variant.name,
                             ts_types.join(", ")
                         ));
                     }
                 }
-                EnumVariant::Struct { name, fields } => {
-                    body.push_str(&format!("  | {{ {tag}: \"{}\"; {content}: {{\n", name));
+                Shape::Map(ref fields) => {
+                    body.push_str(&format!(
+                        "  | {{ {tag}: \"{}\"; {content}: {{\n",
+                        variant.name
+                    ));
                     for field in *fields {
                         let ts_type = self.map_schema_to_type(&field.schema);
                         body.push_str(&format!("    {}: {};\n", field.name, ts_type));
@@ -257,6 +271,7 @@ impl Codegen {
             | PrimitiveType::I64
             | PrimitiveType::F32
             | PrimitiveType::F64 => "number",
+            PrimitiveType::Unit => "null",
             PrimitiveType::Bool => "boolean",
             PrimitiveType::Char => "string",
             PrimitiveType::String => "string",

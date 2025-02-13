@@ -36,7 +36,7 @@ fn generate_struct_schema(name: &syn::Ident, data: &syn::DataStruct) -> proc_mac
                         ::rawr::SchemaDef::Struct(::rawr::StructDef {
                             name: stringify!(#name),
                             module_path: ::core::module_path!(),
-                            fields: ::rawr::Fields::Named(&[
+                            shape: ::rawr::Shape::Map(&[
                                 #( #fields ),*
                             ]),
                         })
@@ -49,15 +49,33 @@ fn generate_struct_schema(name: &syn::Ident, data: &syn::DataStruct) -> proc_mac
                 let ty = &f.ty;
                 quote! { <#ty as ::rawr::Schema>::schema }
             });
+
+            let shape = match fields_unnamed.unnamed.len() {
+                1 => {
+                    quote! {
+                        ::rawr::Shape::Newtype(
+                            {
+                                #( #schemas )*
+                            }
+                        )
+                    }
+                }
+                _ => {
+                    quote! {
+                        ::rawr::Shape::Tuple(&[
+                            #( #schemas ),*
+                        ])
+                    }
+                }
+            };
+
             quote! {
                 impl ::rawr::Schema for #name {
                     fn schema() -> ::rawr::SchemaDef {
                         ::rawr::SchemaDef::Struct(::rawr::StructDef {
                             name: stringify!(#name),
                             module_path: ::core::module_path!(),
-                            fields: ::rawr::Fields::Unnamed(&[
-                                #( #schemas ),*
-                            ]),
+                            shape: #shape,
                         })
                     }
                 }
@@ -70,7 +88,7 @@ fn generate_struct_schema(name: &syn::Ident, data: &syn::DataStruct) -> proc_mac
                         ::rawr::SchemaDef::Struct(::rawr::StructDef {
                             name: stringify!(#name),
                             module_path: ::core::module_path!(),
-                            fields: ::rawr::Fields::Unit,
+                            shape: ::rawr::Shape::Unit,
                         })
                     }
                 }
@@ -100,11 +118,11 @@ fn generate_enum_schema(
                     }
                 });
                 quote! {
-                    ::rawr::EnumVariant::Struct {
+                    ::rawr::VariantDef {
                         name: #variant_str,
-                        fields: &[
+                        shape: ::rawr::Shape::Map(&[
                             #( #fields_iter ),*
-                        ],
+                        ]),
                     }
                 }
             }
@@ -113,19 +131,38 @@ fn generate_enum_schema(
                     let ty = &field.ty;
                     quote! { <#ty as ::rawr::Schema>::schema }
                 });
+
+                let shape = match unnamed.unnamed.len() {
+                    1 => {
+                        quote! {
+                            ::rawr::Shape::Newtype(
+                                {
+                                    #( #fields_iter )*
+                                }
+                            )
+                        }
+                    }
+                    _ => {
+                        quote! {
+                            ::rawr::Shape::Tuple(&[
+                                #( #fields_iter ),*
+                            ])
+                        }
+                    }
+                };
+
                 quote! {
-                    ::rawr::EnumVariant::Tuple {
+                    ::rawr::VariantDef {
                         name: #variant_str,
-                        fields: &[
-                            #( #fields_iter ),*
-                        ],
+                        shape: #shape,
                     }
                 }
             }
             Fields::Unit => {
                 quote! {
-                    ::rawr::EnumVariant::Unit {
+                    ::rawr::VariantDef {
                         name: #variant_str,
+                        shape: ::rawr::Shape::Unit,
                     }
                 }
             }
@@ -147,7 +184,7 @@ fn generate_enum_schema(
                 ::rawr::SchemaDef::Enum(::rawr::EnumDef {
                     name: stringify!(#name),
                     module_path: ::core::module_path!(),
-                    representation: ::rawr::EnumRepresentation::Adjacent {
+                    representation: ::rawr::EnumRepr::Adjacent {
                         tag: #tag,
                         content: #content,
                     },

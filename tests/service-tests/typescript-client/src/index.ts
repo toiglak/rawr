@@ -21,8 +21,8 @@ const TEST_STRUCTURE: Structure = {
   tuple: ["\0", { value: "" }],
   nested_tuple: ["\0", [0, { value: { type: "VariantA" } }]],
   crate_dependency: { value: 0 },
-  array_like: [[], [0, 0, 0], [[]]],
-  tuple_struct: [[], [0, 0, 0], [[]]],
+  sequence: [[], [0, 0, 0], [[]]],
+  structures: [null, [[], [0, 0, 0], [[]]], [[], [0, 0, 0], [[]]]],
 };
 
 async function checkServer(url: string) {
