@@ -26,11 +26,11 @@ async fn main() {
     tokio::spawn(async move {
         let ws = connect_async(&format!("ws://{}", addr)).await.unwrap().0;
 
-        let (mut out, mut inc) = ws.split();
-        let (mut req_rx, res_tx) = server_transport;
+        let (mut socket_tx, mut socket_rx) = ws.split();
+        let (mut server_rx, server_tx) = server_transport;
 
         let handle_incoming = async {
-            while let Some(msg) = inc.next().await {
+            while let Some(msg) = socket_rx.next().await {
                 let msg = match msg {
                     Ok(Message::Close(_))
                     | Err(Error::Protocol(ProtocolError::ResetWithoutClosingHandshake)) => break,
@@ -39,14 +39,14 @@ async fn main() {
                 };
                 let msg: rawr::Response<TestResponse> =
                     serde_json::from_str(&msg.to_string()).unwrap();
-                res_tx.send(msg);
+                server_tx.send(msg);
             }
         };
 
         let handle_outgoing = async {
-            while let Some(req) = req_rx.recv().await {
+            while let Some(req) = server_rx.recv().await {
                 let req = Message::text(serde_json::to_string(&req).unwrap());
-                out.send(req).await.unwrap();
+                socket_tx.send(req).await.unwrap();
             }
         };
 
