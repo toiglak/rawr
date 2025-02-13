@@ -10,7 +10,7 @@ pub trait Schema {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SchemaDef {
-    Primitive(PrimitiveType),
+    Primitive(PrimitiveDef),
     Array(SchemaFn),
     Tuple(&'static [SchemaFn]),
     Enum(EnumDef),
@@ -35,20 +35,20 @@ impl SchemaDef {
     pub fn name(&self) -> Option<&'static str> {
         match self {
             SchemaDef::Primitive(t) => Some(match t {
-                PrimitiveType::Unit => "()",
-                PrimitiveType::U8 => "u8",
-                PrimitiveType::U16 => "u16",
-                PrimitiveType::U32 => "u32",
-                PrimitiveType::U64 => "u64",
-                PrimitiveType::I8 => "i8",
-                PrimitiveType::I16 => "i16",
-                PrimitiveType::I32 => "i32",
-                PrimitiveType::I64 => "i64",
-                PrimitiveType::F32 => "f32",
-                PrimitiveType::F64 => "f64",
-                PrimitiveType::Bool => "bool",
-                PrimitiveType::Char => "char",
-                PrimitiveType::String => "String",
+                PrimitiveDef::Unit => "()",
+                PrimitiveDef::U8 => "u8",
+                PrimitiveDef::U16 => "u16",
+                PrimitiveDef::U32 => "u32",
+                PrimitiveDef::U64 => "u64",
+                PrimitiveDef::I8 => "i8",
+                PrimitiveDef::I16 => "i16",
+                PrimitiveDef::I32 => "i32",
+                PrimitiveDef::I64 => "i64",
+                PrimitiveDef::F32 => "f32",
+                PrimitiveDef::F64 => "f64",
+                PrimitiveDef::Bool => "bool",
+                PrimitiveDef::Char => "char",
+                PrimitiveDef::String => "String",
             }),
             SchemaDef::Array(_) => None,
             SchemaDef::Tuple(_) => None,
@@ -94,7 +94,7 @@ impl SchemaDef {
 //// Primitives
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum PrimitiveType {
+pub enum PrimitiveDef {
     Unit,
     U8,
     U16,
@@ -116,7 +116,7 @@ macro_rules! impl_schema_for_primitive {
         $(
             impl Schema for $t {
                 fn schema() -> SchemaDef {
-                    SchemaDef::Primitive(PrimitiveType::$variant)
+                    SchemaDef::Primitive(PrimitiveDef::$variant)
                 }
             }
         )*

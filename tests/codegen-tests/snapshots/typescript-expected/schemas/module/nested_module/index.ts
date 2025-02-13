@@ -1,4 +1,4 @@
-import { type EnumAdjacent } from "../../enumeration";
+import { type EnumAdjacentlyTagged } from "../../enumeration";
 export type NestedModuleStruct = {
-  value: EnumAdjacent;
+  value: EnumAdjacentlyTagged;
 };

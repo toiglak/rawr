@@ -1,14 +1,16 @@
 import { type ImportedStruct } from "../module";
-export type EnumAdjacent =
+export type EnumAdjacentlyTagged =
   | { type: "VariantA" }
   | { type: "VariantB"; data: [] }
   | { type: "VariantC"; data: number }
-  | { type: "VariantD"; data: [number, ImportedStruct] }
-  | { type: "VariantE"; data: {
+  | { type: "VariantD"; data: null }
+  | { type: "VariantE"; data: ImportedStruct }
+  | { type: "VariantF"; data: [number, ImportedStruct] }
+  | { type: "VariantG"; data: [number, ImportedStruct] }
+  | { type: "VariantH"; data: {
   } }
-  | { type: "VariantF"; data: {
-    a: string;
-    b: [number, ImportedStruct];
-    c: [string, [number, ImportedStruct]];
+  | { type: "VariantI"; data: {
+    a: number;
+    b: ImportedStruct;
   } }
 ;

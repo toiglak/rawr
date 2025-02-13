@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{EnumDef, EnumRepr, PrimitiveType, Schema, SchemaDef, SchemaFn, Shape, StructDef};
+use crate::{EnumDef, EnumRepr, PrimitiveDef, Schema, SchemaDef, SchemaFn, Shape, StructDef};
 
 type StringCow = Cow<'static, str>;
 
@@ -259,22 +259,22 @@ impl Codegen {
         }
     }
 
-    fn map_primitive_to_type(&self, primitive: &PrimitiveType) -> &'static str {
+    fn map_primitive_to_type(&self, primitive: &PrimitiveDef) -> &'static str {
         match primitive {
-            PrimitiveType::U8
-            | PrimitiveType::U16
-            | PrimitiveType::U32
-            | PrimitiveType::U64
-            | PrimitiveType::I8
-            | PrimitiveType::I16
-            | PrimitiveType::I32
-            | PrimitiveType::I64
-            | PrimitiveType::F32
-            | PrimitiveType::F64 => "number",
-            PrimitiveType::Unit => "null",
-            PrimitiveType::Bool => "boolean",
-            PrimitiveType::Char => "string",
-            PrimitiveType::String => "string",
+            PrimitiveDef::U8
+            | PrimitiveDef::U16
+            | PrimitiveDef::U32
+            | PrimitiveDef::U64
+            | PrimitiveDef::I8
+            | PrimitiveDef::I16
+            | PrimitiveDef::I32
+            | PrimitiveDef::I64
+            | PrimitiveDef::F32
+            | PrimitiveDef::F64 => "number",
+            PrimitiveDef::Unit => "null",
+            PrimitiveDef::Bool => "boolean",
+            PrimitiveDef::Char => "string",
+            PrimitiveDef::String => "string",
         }
     }
 }
