@@ -6,7 +6,7 @@ use crate::module::ImportedStruct;
 // Comments show how the JSON representation of each variant looks like.
 // FIXME: It actually shows the JSON for externally tagged enums, not adjacently tagged.
 
-#[derive(Debug, Schema, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Schema, Default, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "data")]
 pub enum EnumAdjacentlyTagged {
     // "VariantA"

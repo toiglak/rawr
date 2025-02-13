@@ -1,5 +1,7 @@
 use futures::{future, stream, SinkExt, StreamExt};
 use schemas::{
+    enumeration::EnumAdjacentlyTagged,
+    module::ImportedStruct,
     service::{TestClient, TestResponse, TestService},
     structure::Structure,
 };
@@ -61,6 +63,62 @@ async fn main() {
         .for_each_concurrent(None, make_request)
         .await;
 
+    // Test complex method.
     let res = client.complex(Structure::default(), 42).await;
     assert_eq!(res.count, 42);
+
+    //// Test sending enum back and forth.
+
+    let en = EnumAdjacentlyTagged::VariantA;
+    let res = client.ping_enum(en.clone()).await;
+    assert_eq!(res, en);
+
+    let en = EnumAdjacentlyTagged::VariantB();
+    let res = client.ping_enum(en.clone()).await;
+    assert_eq!(res, en);
+
+    let en = EnumAdjacentlyTagged::VariantC(42);
+    let res = client.ping_enum(en.clone()).await;
+    assert_eq!(res, en);
+
+    let en = EnumAdjacentlyTagged::VariantD(());
+    let res = client.ping_enum(en.clone()).await;
+    assert_eq!(res, en);
+
+    let en = EnumAdjacentlyTagged::VariantE(ImportedStruct {
+        value: "string".to_string(),
+    });
+    let res = client.ping_enum(en.clone()).await;
+    assert_eq!(res, en);
+
+    let en = EnumAdjacentlyTagged::VariantF((
+        42,
+        ImportedStruct {
+            value: "string".to_string(),
+        },
+    ));
+    let res = client.ping_enum(en.clone()).await;
+    assert_eq!(res, en);
+
+    let en = EnumAdjacentlyTagged::VariantG(
+        42,
+        ImportedStruct {
+            value: "string".to_string(),
+        },
+    );
+    let res = client.ping_enum(en.clone()).await;
+    assert_eq!(res, en);
+
+    let en = EnumAdjacentlyTagged::VariantH {};
+    let res = client.ping_enum(en.clone()).await;
+    assert_eq!(res, en);
+
+    let en = EnumAdjacentlyTagged::VariantI {
+        a: 42,
+        b: ImportedStruct {
+            value: "string".to_string(),
+        },
+    };
+    let res = client.ping_enum(en.clone()).await;
+    assert_eq!(res, en);
 }

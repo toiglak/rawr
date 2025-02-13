@@ -1,12 +1,15 @@
 import type { HandleRequest } from "rawr";
 import type { Structure } from "./typescript-bindings/schemas/structure";
+import type { EnumAdjacentlyTagged } from "./typescript-bindings/schemas/enumeration";
 
 export type TestRequest =
   | { method: "say_hello"; payload: [string] }
-  | { method: "complex"; payload: [Structure, number] };
+  | { method: "complex"; payload: [Structure, number] }
+  | { method: "ping_enum"; payload: [EnumAdjacentlyTagged] };
 export type TestResponse =
   | { method: "say_hello"; payload: string }
-  | { method: "complex"; payload: Structure };
+  | { method: "complex"; payload: Structure }
+  | { method: "ping_enum"; payload: EnumAdjacentlyTagged };
 
 /**
  * This function should be supplied to the specific protocol implementation.
@@ -51,6 +54,21 @@ export function TestClient(
       }
       return res.data.payload;
     },
+    ping_enum: async function (
+      arg: EnumAdjacentlyTagged
+    ): Promise<EnumAdjacentlyTagged> {
+      const res = await make_request({
+        id: counter++,
+        data: {
+          method: "ping_enum",
+          payload: [arg],
+        },
+      });
+      if (res.data.method !== "ping_enum") {
+        throw new Error("Unexpected method: " + res.data.method);
+      }
+      return res.data.payload;
+    },
   };
 }
 
@@ -58,6 +76,9 @@ export type TestService = {
   // string | Promise<string> is used to allow user to use async or sync functions.
   say_hello: (arg: string) => string | Promise<string>;
   complex: (arg: Structure, n: number) => Structure | Promise<Structure>;
+  ping_enum: (
+    arg: EnumAdjacentlyTagged
+  ) => EnumAdjacentlyTagged | Promise<EnumAdjacentlyTagged>;
 };
 
 /**
@@ -88,6 +109,14 @@ export function TestServer(
               request.data.payload[0],
               request.data.payload[1]
             ),
+          },
+        };
+      case "ping_enum":
+        return {
+          id: request.id,
+          data: {
+            method: "ping_enum",
+            payload: await service.ping_enum(request.data.payload[0]),
           },
         };
     }

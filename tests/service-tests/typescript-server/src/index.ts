@@ -17,6 +17,9 @@ const handle_request = TestServer({
     arg.count += n;
     return arg;
   },
+  ping_enum: function (arg) {
+    return arg;
+  },
 });
 
 Bun.serve({

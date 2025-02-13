@@ -1,4 +1,5 @@
 use futures::{future, SinkExt, StreamExt};
+use schemas::enumeration::EnumAdjacentlyTagged;
 use schemas::service::{TestRequest, TestServer, TestService};
 use schemas::structure::Structure;
 use tokio::net::TcpListener;
@@ -18,6 +19,10 @@ impl TestService for ServiceImpl {
     async fn complex(&self, mut input: Structure, n: i32) -> Structure {
         input.count += n;
         input
+    }
+
+    async fn ping_enum(&self, arg: EnumAdjacentlyTagged) -> EnumAdjacentlyTagged {
+        arg
     }
 }
 

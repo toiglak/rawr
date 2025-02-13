@@ -2,6 +2,7 @@
 
 use futures::stream::{self, StreamExt};
 use schemas::{
+    enumeration::EnumAdjacentlyTagged,
     service::{TestClient, TestServer, TestService},
     structure::Structure,
 };
@@ -22,6 +23,10 @@ impl TestService for ServiceImpl {
     async fn complex(&self, mut input: Structure, n: i32) -> Structure {
         input.count += n;
         input
+    }
+
+    async fn ping_enum(&self, arg: EnumAdjacentlyTagged) -> EnumAdjacentlyTagged {
+        arg
     }
 }
 

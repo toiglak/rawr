@@ -7,6 +7,7 @@ import {
 } from "../../generated";
 import type { RawrRequest, RawrResponse } from "rawr";
 import type { Structure } from "../../typescript-bindings/schemas/structure";
+import type { EnumAdjacentlyTagged } from "../../typescript-bindings/schemas/enumeration";
 
 const addr = process.env.SERVER_ADDR;
 if (!addr) throw new Error("SERVER_ADDR not set");
@@ -62,9 +63,50 @@ async function checkServer(url: string) {
     console.log(`[${i++}] ${res}`);
   }
 
+  // Test complex method.
+
   const res = await client.complex(TEST_STRUCTURE, 42);
   const expected = { ...TEST_STRUCTURE, count: 42 };
   assert_eq(res, expected);
+
+  // Test sending enum back and forth.
+  {
+    let en: EnumAdjacentlyTagged = { type: "VariantA" };
+    let res = await client.ping_enum(en);
+    assert_eq(res, en);
+
+    en = { type: "VariantB", data: [] };
+    res = await client.ping_enum(en);
+    assert_eq(res, en);
+
+    en = { type: "VariantC", data: 42 };
+    res = await client.ping_enum(en);
+    assert_eq(res, en);
+
+    en = { type: "VariantD", data: null };
+    res = await client.ping_enum(en);
+    assert_eq(res, en);
+
+    en = { type: "VariantE", data: { value: "string" } };
+    res = await client.ping_enum(en);
+    assert_eq(res, en);
+
+    en = { type: "VariantF", data: [42, { value: "string" }] };
+    res = await client.ping_enum(en);
+    assert_eq(res, en);
+
+    en = { type: "VariantG", data: [42, { value: "string" }] };
+    res = await client.ping_enum(en);
+    assert_eq(res, en);
+
+    en = { type: "VariantH", data: {} };
+    res = await client.ping_enum(en);
+    assert_eq(res, en);
+
+    en = { type: "VariantI", data: { a: 42, b: { value: "string" } } };
+    res = await client.ping_enum(en);
+    assert_eq(res, en);
+  }
 
   ws.close();
 }

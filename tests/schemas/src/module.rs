@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod nested_module;
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Schema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Schema)]
 pub struct ImportedStruct {
     pub value: String,
 }

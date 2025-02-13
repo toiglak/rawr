@@ -2,13 +2,14 @@ use rawr::{AbstractClient, AbstractServer, ClientTransport, ServerTransport};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
-use crate::structure::Structure;
+use crate::{enumeration::EnumAdjacentlyTagged, structure::Structure};
 
 #[allow(async_fn_in_trait)]
 pub trait TestService: Clone + 'static + Send + Sync {
     async fn say_hello(&self, arg: String) -> String;
     /// Service should increment `count` by `n`.
     async fn complex(&self, input: Structure, n: i32) -> Structure;
+    async fn ping_enum(&self, arg: EnumAdjacentlyTagged) -> EnumAdjacentlyTagged;
 }
 
 ///////////// GENERATED CODE /////////////
@@ -19,6 +20,7 @@ pub trait TestService: Clone + 'static + Send + Sync {
 pub enum TestRequest {
     complex((Structure, i32)),
     say_hello((String,)),
+    ping_enum((EnumAdjacentlyTagged,)),
 }
 
 #[allow(non_camel_case_types)]
@@ -27,6 +29,7 @@ pub enum TestRequest {
 pub enum TestResponse {
     complex(Structure),
     say_hello(String),
+    ping_enum(EnumAdjacentlyTagged),
 }
 
 #[derive(Clone)]
@@ -87,6 +90,19 @@ impl TestService for TestClient {
             panic!("Unexpected response")
         }
     }
+
+    async fn ping_enum(&self, arg: EnumAdjacentlyTagged) -> EnumAdjacentlyTagged {
+        let req = TestRequest::ping_enum((arg,));
+        let res = self.inner.make_request(req).await;
+
+        #[allow(irrefutable_let_patterns)]
+        if let TestResponse::ping_enum(ret) = res {
+            ret
+        } else {
+            // Perhaps this should return an error instead of panicking?
+            panic!("Unexpected response")
+        }
+    }
 }
 
 pub struct TestServer;
@@ -125,6 +141,10 @@ impl TestServer {
                     TestRequest::complex((arg0, arg1)) => {
                         let data = handler.complex(arg0, arg1).await;
                         TestResponse::complex(data)
+                    }
+                    TestRequest::ping_enum((arg0,)) => {
+                        let data = handler.ping_enum(arg0).await;
+                        TestResponse::ping_enum(data)
                     }
                 }
             }
