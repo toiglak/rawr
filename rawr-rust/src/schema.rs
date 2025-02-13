@@ -11,7 +11,7 @@ pub trait Schema {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SchemaDef {
     Primitive(PrimitiveDef),
-    Array(SchemaFn),
+    Sequence(SchemaFn),
     Tuple(&'static [SchemaFn]),
     Enum(EnumDef),
     Struct(StructDef),
@@ -25,7 +25,7 @@ impl SchemaDef {
     /// in the generated binding file.
     pub fn get_generic_dependencies(&self) -> &[SchemaFn] {
         match self {
-            SchemaDef::Array(schema) => std::slice::from_ref(schema),
+            SchemaDef::Sequence(schema) => std::slice::from_ref(schema),
             SchemaDef::Tuple(fields) => fields,
             // TODO: Struct and Enum generics
             _ => &[],
@@ -50,7 +50,7 @@ impl SchemaDef {
                 PrimitiveDef::Char => "char",
                 PrimitiveDef::String => "String",
             }),
-            SchemaDef::Array(_) => None,
+            SchemaDef::Sequence(_) => None,
             SchemaDef::Tuple(_) => None,
             SchemaDef::Struct(def) => Some(def.name),
             SchemaDef::Enum(def) => Some(def.name),
@@ -60,7 +60,7 @@ impl SchemaDef {
     pub fn module_path(&self) -> Option<&'static str> {
         match self {
             SchemaDef::Primitive(_) => None,
-            SchemaDef::Array(_) => None,
+            SchemaDef::Sequence(_) => None,
             SchemaDef::Tuple(_) => None,
             SchemaDef::Struct(def) => Some(def.module_path),
             SchemaDef::Enum(def) => Some(def.module_path),
@@ -70,7 +70,7 @@ impl SchemaDef {
     pub fn visit_dependencies(&self, mut visit: impl FnMut(SchemaDef)) {
         match self {
             SchemaDef::Primitive(_) => {}
-            SchemaDef::Array(schema) => {
+            SchemaDef::Sequence(schema) => {
                 visit(schema());
             }
             SchemaDef::Tuple(fields) => {
@@ -144,31 +144,31 @@ impl_schema_for_primitive!(
 
 impl<T: Schema> Schema for Vec<T> {
     fn schema() -> SchemaDef {
-        SchemaDef::Array(T::schema)
+        SchemaDef::Sequence(T::schema)
     }
 }
 
 impl<T: Schema> Schema for [T] {
     fn schema() -> SchemaDef {
-        SchemaDef::Array(T::schema)
+        SchemaDef::Sequence(T::schema)
     }
 }
 
 impl<T: Schema> Schema for &[T] {
     fn schema() -> SchemaDef {
-        SchemaDef::Array(T::schema)
+        SchemaDef::Sequence(T::schema)
     }
 }
 
 impl<T: Schema> Schema for &mut [T] {
     fn schema() -> SchemaDef {
-        SchemaDef::Array(T::schema)
+        SchemaDef::Sequence(T::schema)
     }
 }
 
 impl<const N: usize, T: Schema> Schema for [T; N] {
     fn schema() -> SchemaDef {
-        SchemaDef::Array(T::schema)
+        SchemaDef::Sequence(T::schema)
     }
 }
 

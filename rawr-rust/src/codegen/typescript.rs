@@ -65,7 +65,7 @@ impl Codegen {
         let mut modules: HashMap<&'static str, Vec<SchemaDef>> = HashMap::new();
         for schema in &self.schemas {
             match schema {
-                SchemaDef::Primitive(..) | SchemaDef::Array(..) | SchemaDef::Tuple(..) => {}
+                SchemaDef::Primitive(..) | SchemaDef::Sequence(..) | SchemaDef::Tuple(..) => {}
                 SchemaDef::Struct(struct_def) => {
                     modules
                         .entry(struct_def.module_path)
@@ -243,7 +243,7 @@ impl Codegen {
     fn map_schema_to_type(&self, schema: &SchemaFn) -> StringCow {
         match schema() {
             SchemaDef::Primitive(ref prim) => self.map_primitive_to_type(prim).into(),
-            SchemaDef::Array(ref schema) => {
+            SchemaDef::Sequence(ref schema) => {
                 let ty = self.map_schema_to_type(schema);
                 format!("{}[]", ty).into()
             }
