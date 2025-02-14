@@ -125,6 +125,8 @@ impl AbstractServer {
                 res_tx.send(resp);
             }
         };
+        // TODO: Consider returning a stream, so that user can handle requests in
+        // parallel if they want to.
         req_rx.0.for_each_concurrent(None, handle_request).await;
     }
 }
