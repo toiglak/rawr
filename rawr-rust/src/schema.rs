@@ -308,6 +308,7 @@ pub struct VariantDef {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum EnumRepr {
+    External,
     Adjacent {
         tag: &'static str,
         content: &'static str,

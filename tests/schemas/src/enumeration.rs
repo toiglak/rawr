@@ -3,12 +3,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::module::ImportedStruct;
 
-// Comments show how the JSON representation of each variant looks like.
-// FIXME: It actually shows the JSON for externally tagged enums, not adjacently tagged.
+#[derive(Debug, Clone, Schema, Default, Serialize, Deserialize, PartialEq)]
+pub struct TestEnums {
+    pub external: EnumExternallyTagged,
+    pub adjecent: EnumAdjacentlyTagged,
+}
 
 #[derive(Debug, Clone, Schema, Default, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "type", content = "data")]
-pub enum EnumAdjacentlyTagged {
+pub enum EnumExternallyTagged {
     // "VariantA"
     #[default]
     VariantA,
@@ -27,6 +29,24 @@ pub enum EnumAdjacentlyTagged {
     // {"VariantH":{}}
     VariantH {},
     // {"VariantI":{"a":0,"b":{"value":"string"}}}
+    VariantI {
+        a: i32,
+        b: ImportedStruct,
+    },
+}
+
+#[derive(Debug, Clone, Schema, Default, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", content = "data")]
+pub enum EnumAdjacentlyTagged {
+    #[default]
+    VariantA,
+    VariantB(),
+    VariantC(i32),
+    VariantD(()),
+    VariantE(ImportedStruct),
+    VariantF((i32, ImportedStruct)),
+    VariantG(i32, ImportedStruct),
+    VariantH {},
     VariantI {
         a: i32,
         b: ImportedStruct,

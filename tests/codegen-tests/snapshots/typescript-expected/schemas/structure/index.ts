@@ -2,6 +2,7 @@ import { type ImportedStruct } from "../module";
 import { type NestedModuleStruct } from "../module/nested_module";
 import { type SequenceTypes } from "../sequence";
 import { type StructFromOtherCrate } from "../../schemas_subcrate";
+import { type TestEnums } from "../enumeration";
 export type NewtypeStruct = [string[], number[], ImportedStruct[][]];
 export type Structure = {
   name: string;
@@ -10,6 +11,7 @@ export type Structure = {
   imported: ImportedStruct;
   tuple: [string, ImportedStruct];
   nested_tuple: [string, [number, NestedModuleStruct]];
+  enums: TestEnums;
   crate_dependency: StructFromOtherCrate;
   sequence: SequenceTypes;
   structures: [UnitStruct, NewtypeStruct, TupleStruct];

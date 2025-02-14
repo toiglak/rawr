@@ -5,7 +5,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{EnumDef, EnumRepr, PrimitiveDef, Schema, SchemaDef, SchemaFn, Shape, StructDef};
+use crate::{
+    EnumDef, EnumRepr, PrimitiveDef, Schema, SchemaDef, SchemaFn, Shape, StructDef, VariantDef,
+};
 
 type StringCow = Cow<'static, str>;
 
@@ -190,54 +192,78 @@ impl Codegen {
 
     fn generate_enum_body(&self, enum_def: &EnumDef, body: &mut String) {
         body.push_str(&format!("export type {} =\n", enum_def.name));
-        let (tag, content) = match enum_def.representation {
-            EnumRepr::Adjacent { tag, content } => (tag, content),
-        };
         for variant in enum_def.variants {
-            match variant.shape {
-                Shape::Unit => {
-                    body.push_str(&format!("  | {{ {tag}: \"{}\" }}\n", variant.name));
+            body.push_str(&self.generate_enum_variant(&enum_def.representation, variant));
+        }
+        body.push_str(";\n");
+    }
+
+    fn generate_enum_variant(&self, repr: &EnumRepr, variant: &VariantDef) -> String {
+        match variant.shape {
+            Shape::Unit => match repr {
+                EnumRepr::External => format!("  | \"{}\"\n", variant.name),
+                EnumRepr::Adjacent { tag, content: _ } => {
+                    format!("  | {{ {}: \"{}\" }}\n", tag, variant.name)
                 }
-                Shape::Newtype(ref schema) => {
-                    let ts_type = self.map_schema_to_type(schema);
-                    body.push_str(&format!(
-                        "  | {{ {tag}: \"{}\"; {content}: {} }}\n",
-                        variant.name, ts_type
-                    ));
+            },
+            Shape::Newtype(ref schema) => {
+                let ts_type = self.map_schema_to_type(schema);
+                match repr {
+                    EnumRepr::External => format!("  | {{ \"{}\": {} }}\n", variant.name, ts_type),
+                    EnumRepr::Adjacent { tag, content } => {
+                        format!(
+                            "  | {{ {}: \"{}\"; {}: {} }}\n",
+                            tag, variant.name, content, ts_type
+                        )
+                    }
                 }
-                Shape::Tuple(ref fields) => {
-                    if fields.len() == 1 {
-                        let ts_type = self.map_schema_to_type(&fields[0]);
-                        body.push_str(&format!(
-                            "  | {{ {tag}: \"{}\"; {content}: {} }}\n",
-                            variant.name, ts_type
-                        ));
-                    } else {
-                        let ts_types: Vec<StringCow> = fields
-                            .iter()
-                            .map(|schema| self.map_schema_to_type(schema))
-                            .collect();
-                        body.push_str(&format!(
-                            "  | {{ {tag}: \"{}\"; {content}: [{}] }}\n",
+            }
+            Shape::Tuple(ref fields) => {
+                let ts_types: Vec<StringCow> = fields
+                    .iter()
+                    .map(|schema| self.map_schema_to_type(schema))
+                    .collect();
+                match repr {
+                    EnumRepr::External => {
+                        format!(
+                            "  | {{ \"{}\": [{}] }}\n",
                             variant.name,
                             ts_types.join(", ")
-                        ));
+                        )
+                    }
+                    EnumRepr::Adjacent { tag, content } => {
+                        format!(
+                            "  | {{ {}: \"{}\"; {}: [{}] }}\n",
+                            tag,
+                            variant.name,
+                            content,
+                            ts_types.join(", ")
+                        )
                     }
                 }
-                Shape::Map(ref fields) => {
-                    body.push_str(&format!(
-                        "  | {{ {tag}: \"{}\"; {content}: {{\n",
-                        variant.name
-                    ));
-                    for field in *fields {
+            }
+            Shape::Map(ref fields) => {
+                let field_strs: Vec<String> = fields
+                    .iter()
+                    .map(|field| {
                         let ts_type = self.map_schema_to_type(&field.schema);
-                        body.push_str(&format!("    {}: {};\n", field.name, ts_type));
+                        format!("{}: {}", field.name, ts_type)
+                    })
+                    .collect();
+                let fields_str = field_strs.join(", ");
+                match repr {
+                    EnumRepr::External => {
+                        format!("  | {{ \"{}\": {{ {} }} }}\n", variant.name, fields_str)
                     }
-                    body.push_str("  } }\n");
+                    EnumRepr::Adjacent { tag, content } => {
+                        format!(
+                            "  | {{ {}: \"{}\"; {}: {{ {} }} }}\n",
+                            tag, variant.name, content, fields_str
+                        )
+                    }
                 }
             }
         }
-        body.push_str(";\n");
     }
 
     fn map_schema_to_type(&self, schema: &SchemaFn) -> StringCow {

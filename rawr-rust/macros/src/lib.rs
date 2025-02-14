@@ -174,9 +174,25 @@ fn generate_enum_schema(
     // code generators to be maximally flexible, as they would not depend on rawr
     // on supporting all libraries they're interested in.
     //
-    // We could expose it as `Attribute { meta: &str, value: &str }` or similar.
-    let (tag, content) = serde::parse_attr(attrs)
-        .expect("expected #[serde(tag = \"<tag>\", content = \"<content>\")]");
+    // We could expose it as `Attribute { meta: &str, value: &str }` or similar. We
+    // could even provide default implementations for common libraries like serde.
+
+    // If no serde attributes are found, it's an externally tagged enum
+    let rep = match serde::parse_attr(attrs) {
+        Some((tag, content)) => {
+            quote! {
+                ::rawr::EnumRepr::Adjacent {
+                    tag: #tag,
+                    content: #content,
+                }
+            }
+        }
+        None => {
+            quote! {
+                ::rawr::EnumRepr::External
+            }
+        }
+    };
 
     quote! {
         impl ::rawr::Schema for #name {
@@ -184,10 +200,7 @@ fn generate_enum_schema(
                 ::rawr::SchemaDef::Enum(::rawr::EnumDef {
                     name: stringify!(#name),
                     module_path: ::core::module_path!(),
-                    representation: ::rawr::EnumRepr::Adjacent {
-                        tag: #tag,
-                        content: #content,
-                    },
+                    representation: #rep,
                     variants: &[
                         #( #variants_iter ),*
                     ],

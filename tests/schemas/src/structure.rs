@@ -3,6 +3,7 @@ use schemas_subcrate::StructFromOtherCrate;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    enumeration::TestEnums,
     module::{nested_module::NestedModuleStruct, ImportedStruct},
     sequence::SequenceTypes,
 };
@@ -15,6 +16,7 @@ pub struct Structure {
     pub imported: ImportedStruct,
     pub tuple: (char, ImportedStruct),
     pub nested_tuple: (char, (i32, NestedModuleStruct)),
+    pub enums: TestEnums,
     pub crate_dependency: StructFromOtherCrate,
     pub sequence: SequenceTypes,
     pub structures: (UnitStruct, NewtypeStruct, TupleStruct),
