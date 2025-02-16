@@ -18,20 +18,6 @@ pub enum SchemaDef {
 }
 
 impl SchemaDef {
-    /// Returns type dependencies for the generic schemas.
-    ///
-    /// When a type includes generics, concrete instantiations of these generics
-    /// (e.g., `MyType` in `Option<MyType>`) must be imported at the point of use
-    /// in the generated binding file.
-    pub fn get_generic_dependencies(&self) -> &[SchemaFn] {
-        match self {
-            SchemaDef::Sequence(schema) => std::slice::from_ref(schema),
-            SchemaDef::Tuple(fields) => fields,
-            // TODO: Struct and Enum generics
-            _ => &[],
-        }
-    }
-
     pub fn name(&self) -> Option<&'static str> {
         match self {
             SchemaDef::Primitive(t) => Some(match t {
@@ -87,6 +73,20 @@ impl SchemaDef {
                     variant.shape.visit_dependencies(&mut visit);
                 }
             }
+        }
+    }
+
+    /// Returns type dependencies for the generic schemas.
+    ///
+    /// When a type includes generics, concrete instantiations of these generics
+    /// (e.g., `MyType` in `Option<MyType>`) must be imported at the point of use
+    /// in the generated binding file.
+    pub fn generic_dependencies(&self) -> &[SchemaFn] {
+        match self {
+            SchemaDef::Sequence(schema) => std::slice::from_ref(schema),
+            SchemaDef::Tuple(fields) => fields,
+            // TODO: Struct and Enum generics
+            _ => &[],
         }
     }
 }

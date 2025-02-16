@@ -93,10 +93,16 @@ impl Codegen {
         let output_file_path = module_dir.join("index.ts");
 
         let imports = self.generate_imports(module_path, schema_defs);
-        let body = self.generate_body(schema_defs);
+        let defs = self.generate_definitions(schema_defs);
 
-        let final_output = format!("{}{}", imports, body);
-        fs::write(&output_file_path, final_output).expect("Failed to write module bindings");
+        let file_content = format!("{}{}", imports, defs);
+        fs::write(&output_file_path, file_content).expect("Failed to write module bindings");
+    }
+
+    fn create_module_directory(&self, module_path: &str) -> PathBuf {
+        let module_dir = Path::new(&self.output_path).join(module_path.replace("::", "/"));
+        fs::create_dir_all(&module_dir).expect("Failed to create module directory");
+        module_dir
     }
 
     fn generate_imports(&self, module_path: &str, schema_defs: &[SchemaDef]) -> String {
@@ -106,7 +112,7 @@ impl Codegen {
 
         fn visit(dependencies: &mut BTreeSet<SchemaDef>, def: SchemaDef, module_path: &&str) {
             // If the type contains other types as part of its definition, visit them
-            for dep_def in def.get_generic_dependencies() {
+            for dep_def in def.generic_dependencies() {
                 visit(dependencies, dep_def(), module_path);
             }
 
@@ -137,65 +143,114 @@ impl Codegen {
         imports
     }
 
-    fn generate_body(&self, schema_defs: &[SchemaDef]) -> String {
-        let mut body = String::new();
+    fn generate_definitions(&self, schema_defs: &[SchemaDef]) -> String {
+        let mut buf = String::new();
         for schema in schema_defs {
-            match schema {
-                SchemaDef::Struct(struct_def) => {
-                    self.generate_struct_body(struct_def, &mut body);
-                }
-                SchemaDef::Enum(enum_def) => {
-                    self.generate_enum_body(enum_def, &mut body);
-                }
-                _ => {}
-            }
+            self.generate_definition(&mut buf, schema);
         }
-        body
+        buf
     }
 
-    fn create_module_directory(&self, module_path: &str) -> PathBuf {
-        let module_dir = Path::new(&self.output_path).join(module_path.replace("::", "/"));
-        fs::create_dir_all(&module_dir).expect("Failed to create module directory");
-        module_dir
+    /// Example of a definition.
+    ///
+    /// ```typescript
+    /// // This whole block is a definition.
+    /// export type Example = {
+    ///     a: string;
+    ///     b: Option<string>;
+    /// };
+    /// ```
+    fn generate_definition(&self, buf: &mut String, schema: &SchemaDef) {
+        match schema {
+            SchemaDef::Struct(struct_def) => self.generate_struct_definition(struct_def, buf),
+            SchemaDef::Enum(enum_def) => self.generate_enum_definition(enum_def, buf),
+            _ => {}
+        }
     }
 
-    fn generate_struct_body(&self, struct_def: &StructDef, body: &mut String) {
+    /// Example of a type.
+    ///
+    /// ```typescript
+    /// export type Example = {
+    ///      a: string; // <- `string` is a type
+    ///      b: Option<string>; // <- `Option<string>` is a type
+    /// };
+    /// ```
+    fn generate_type(&self, schema: &SchemaFn) -> StringCow {
+        match schema() {
+            SchemaDef::Primitive(ref prim) => self.primitive_to_type(prim).into(),
+            SchemaDef::Sequence(ref schema) => {
+                let ty = self.generate_type(schema);
+                format!("{}[]", ty).into()
+            }
+            SchemaDef::Tuple(ref schemas) => {
+                let ts_types: Vec<StringCow> = schemas
+                    .iter()
+                    .map(|schema| self.generate_type(schema))
+                    .collect();
+                format!("[{}]", ts_types.join(", ")).into()
+            }
+            SchemaDef::Struct(ref struct_type) => struct_type.name.into(),
+            SchemaDef::Enum(enum_def) => enum_def.name.into(),
+        }
+    }
+
+    fn primitive_to_type(&self, primitive: &PrimitiveDef) -> &'static str {
+        match primitive {
+            PrimitiveDef::U8
+            | PrimitiveDef::U16
+            | PrimitiveDef::U32
+            | PrimitiveDef::U64
+            | PrimitiveDef::I8
+            | PrimitiveDef::I16
+            | PrimitiveDef::I32
+            | PrimitiveDef::I64
+            | PrimitiveDef::F32
+            | PrimitiveDef::F64 => "number",
+            PrimitiveDef::Unit => "null",
+            PrimitiveDef::Bool => "boolean",
+            PrimitiveDef::Char => "string",
+            PrimitiveDef::String => "string",
+        }
+    }
+
+    fn generate_struct_definition(&self, struct_def: &StructDef, buf: &mut String) {
         match struct_def.shape {
             Shape::Unit => {
-                body.push_str(&format!("export type {} = null;\n", struct_def.name));
+                buf.push_str(&format!("export type {} = null;\n", struct_def.name));
             }
             Shape::Newtype(ref schema) => {
-                let ts_type = self.map_schema_to_type(schema);
-                body.push_str(&format!("export type {} = {};\n", struct_def.name, ts_type));
+                let ty = self.generate_type(schema);
+                buf.push_str(&format!("export type {} = {};\n", struct_def.name, ty));
             }
             Shape::Tuple(ref fields) => {
                 let ts_types: Vec<StringCow> = fields
                     .iter()
-                    .map(|schema| self.map_schema_to_type(schema))
+                    .map(|schema| self.generate_type(schema))
                     .collect();
-                body.push_str(&format!(
+                buf.push_str(&format!(
                     "export type {} = [{}];\n",
                     struct_def.name,
                     ts_types.join(", ")
                 ));
             }
             Shape::Map(ref fields) => {
-                body.push_str(&format!("export type {} = {{\n", struct_def.name));
+                buf.push_str(&format!("export type {} = {{\n", struct_def.name));
                 for field in *fields {
-                    let ts_type = self.map_schema_to_type(&field.schema);
-                    body.push_str(&format!("  {}: {};\n", field.name, ts_type));
+                    let ty = self.generate_type(&field.schema);
+                    buf.push_str(&format!("  {}: {};\n", field.name, ty));
                 }
-                body.push_str("};\n");
+                buf.push_str("};\n");
             }
         }
     }
 
-    fn generate_enum_body(&self, enum_def: &EnumDef, body: &mut String) {
-        body.push_str(&format!("export type {} =\n", enum_def.name));
+    fn generate_enum_definition(&self, enum_def: &EnumDef, buf: &mut String) {
+        buf.push_str(&format!("export type {} =\n", enum_def.name));
         for variant in enum_def.variants {
-            body.push_str(&self.generate_enum_variant(&enum_def.representation, variant));
+            buf.push_str(&self.generate_enum_variant(&enum_def.representation, variant));
         }
-        body.push_str(";\n");
+        buf.push_str(";\n");
     }
 
     fn generate_enum_variant(&self, repr: &EnumRepr, variant: &VariantDef) -> String {
@@ -207,13 +262,13 @@ impl Codegen {
                 }
             },
             Shape::Newtype(ref schema) => {
-                let ts_type = self.map_schema_to_type(schema);
+                let ty = self.generate_type(schema);
                 match repr {
-                    EnumRepr::External => format!("  | {{ \"{}\": {} }}\n", variant.name, ts_type),
+                    EnumRepr::External => format!("  | {{ \"{}\": {} }}\n", variant.name, ty),
                     EnumRepr::Adjacent { tag, content } => {
                         format!(
                             "  | {{ {}: \"{}\"; {}: {} }}\n",
-                            tag, variant.name, content, ts_type
+                            tag, variant.name, content, ty
                         )
                     }
                 }
@@ -221,7 +276,7 @@ impl Codegen {
             Shape::Tuple(ref fields) => {
                 let ts_types: Vec<StringCow> = fields
                     .iter()
-                    .map(|schema| self.map_schema_to_type(schema))
+                    .map(|schema| self.generate_type(schema))
                     .collect();
                 match repr {
                     EnumRepr::External => {
@@ -246,8 +301,8 @@ impl Codegen {
                 let field_strs: Vec<String> = fields
                     .iter()
                     .map(|field| {
-                        let ts_type = self.map_schema_to_type(&field.schema);
-                        format!("{}: {}", field.name, ts_type)
+                        let ty = self.generate_type(&field.schema);
+                        format!("{}: {}", field.name, ty)
                     })
                     .collect();
                 let fields_str = field_strs.join(", ");
@@ -263,44 +318,6 @@ impl Codegen {
                     }
                 }
             }
-        }
-    }
-
-    fn map_schema_to_type(&self, schema: &SchemaFn) -> StringCow {
-        match schema() {
-            SchemaDef::Primitive(ref prim) => self.map_primitive_to_type(prim).into(),
-            SchemaDef::Sequence(ref schema) => {
-                let ty = self.map_schema_to_type(schema);
-                format!("{}[]", ty).into()
-            }
-            SchemaDef::Tuple(ref schemas) => {
-                let ts_types: Vec<StringCow> = schemas
-                    .iter()
-                    .map(|schema| self.map_schema_to_type(schema))
-                    .collect();
-                format!("[{}]", ts_types.join(", ")).into()
-            }
-            SchemaDef::Struct(ref struct_type) => struct_type.name.into(),
-            SchemaDef::Enum(enum_def) => enum_def.name.into(),
-        }
-    }
-
-    fn map_primitive_to_type(&self, primitive: &PrimitiveDef) -> &'static str {
-        match primitive {
-            PrimitiveDef::U8
-            | PrimitiveDef::U16
-            | PrimitiveDef::U32
-            | PrimitiveDef::U64
-            | PrimitiveDef::I8
-            | PrimitiveDef::I16
-            | PrimitiveDef::I32
-            | PrimitiveDef::I64
-            | PrimitiveDef::F32
-            | PrimitiveDef::F64 => "number",
-            PrimitiveDef::Unit => "null",
-            PrimitiveDef::Bool => "boolean",
-            PrimitiveDef::Char => "string",
-            PrimitiveDef::String => "string",
         }
     }
 }
