@@ -13,7 +13,6 @@ const addr = process.env.SERVER_ADDR;
 if (!addr) throw new Error("SERVER_ADDR not set");
 const url = `ws://${addr}`;
 
-// Follows Rust's Structure::default().
 const TEST_STRUCTURE: Structure = {
   name: "",
   count: 0,
@@ -28,6 +27,11 @@ const TEST_STRUCTURE: Structure = {
   crate_dependency: { value: 0 },
   sequence: [[], [0, 0, 0], [[]]],
   structures: [null, [[], [0, 0, 0], [[]]], [[], [0, 0, 0], [[]]]],
+  results: {
+    a: { Ok: "Ok" },
+    b: { Err: [0, 0] },
+    c: { Ok: { value: "" } },
+  },
 };
 
 async function checkServer(url: string) {

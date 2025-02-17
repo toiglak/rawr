@@ -1,4 +1,4 @@
-use rawr::{FieldDef, PrimitiveDef, Schema, SchemaDef, Shape, StructDef};
+use rawr::{FieldDef, PrimitiveDef, Schema, SchemaDef, SchemaPtr, Shape, StructDef};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -13,8 +13,9 @@ impl Schema for StructFromOtherCrate {
             module_path: "schemas_subcrate",
             shape: Shape::Map(&[FieldDef {
                 name: "value",
-                schema: || SchemaDef::Primitive(PrimitiveDef::I32),
+                schema: SchemaPtr(|| SchemaDef::Primitive(PrimitiveDef::I32)),
             }]),
+            generic: None,
         })
     }
 }

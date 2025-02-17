@@ -1,5 +1,6 @@
 import { type ImportedStruct } from "../module";
 import { type NestedModuleStruct } from "../module/nested_module";
+import { type ResultsTest } from "../result";
 import { type SequenceTypes } from "../sequence";
 import { type StructFromOtherCrate } from "../../schemas_subcrate";
 import { type TestEnums } from "../enumeration";
@@ -15,6 +16,7 @@ export type Structure = {
   crate_dependency: StructFromOtherCrate;
   sequence: SequenceTypes;
   structures: [UnitStruct, NewtypeStruct, TupleStruct];
+  results: ResultsTest<ImportedStruct>;
 };
 export type TupleStruct = [string[], number[], ImportedStruct[][]];
 export type UnitStruct = null;

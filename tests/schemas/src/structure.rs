@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     enumeration::TestEnums,
     module::{nested_module::NestedModuleStruct, ImportedStruct},
+    result::ResultsTest,
     sequence::SequenceTypes,
 };
 
@@ -20,6 +21,7 @@ pub struct Structure {
     pub crate_dependency: StructFromOtherCrate,
     pub sequence: SequenceTypes,
     pub structures: (UnitStruct, NewtypeStruct, TupleStruct),
+    pub results: ResultsTest<ImportedStruct>,
 }
 
 #[derive(Debug, Default, Schema, Serialize, Deserialize, PartialEq)]

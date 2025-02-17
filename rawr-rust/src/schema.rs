@@ -1,8 +1,4 @@
-// NOTE: We use this to prevent "infinitely sized structures" in [SchemaDef],
-// since it can contain itself.
-//
-/// Treat this as "a pointer to a schema definition".
-pub type SchemaFn = fn() -> SchemaDef;
+use std::fmt::{self, Debug, Formatter};
 
 pub trait Schema {
     fn schema() -> SchemaDef;
@@ -11,10 +7,11 @@ pub trait Schema {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SchemaDef {
     Primitive(PrimitiveDef),
-    Sequence(SchemaFn),
-    Tuple(&'static [SchemaFn]),
+    Sequence(SchemaPtr),
+    Tuple(&'static [SchemaPtr]),
     Enum(EnumDef),
     Struct(StructDef),
+    GenericParameter(&'static str),
 }
 
 impl SchemaDef {
@@ -40,6 +37,7 @@ impl SchemaDef {
             SchemaDef::Tuple(_) => None,
             SchemaDef::Struct(def) => Some(def.name),
             SchemaDef::Enum(def) => Some(def.name),
+            SchemaDef::GenericParameter(_) => None,
         }
     }
 
@@ -50,6 +48,7 @@ impl SchemaDef {
             SchemaDef::Tuple(_) => None,
             SchemaDef::Struct(def) => Some(def.module_path),
             SchemaDef::Enum(def) => Some(def.module_path),
+            SchemaDef::GenericParameter(_) => None,
         }
     }
 
@@ -57,12 +56,11 @@ impl SchemaDef {
         match self {
             SchemaDef::Primitive(_) => {}
             SchemaDef::Sequence(schema) => {
-                visit(schema());
+                visit(schema.get());
             }
             SchemaDef::Tuple(fields) => {
-                for schema_fn in *fields {
-                    let schema = schema_fn();
-                    visit(schema);
+                for schema in *fields {
+                    visit(schema.get());
                 }
             }
             SchemaDef::Struct(struct_def) => {
@@ -73,21 +71,60 @@ impl SchemaDef {
                     variant.shape.visit_dependencies(&mut visit);
                 }
             }
+            SchemaDef::GenericParameter(_) => {}
         }
     }
 
-    /// Returns type dependencies for the generic schemas.
+    /// Returns concrete type dependencies for the generic schemas.
     ///
     /// When a type includes generics, concrete instantiations of these generics
     /// (e.g., `MyType` in `Option<MyType>`) must be imported at the point of use
     /// in the generated binding file.
-    pub fn generic_dependencies(&self) -> &[SchemaFn] {
+    pub fn generic_dependencies(&self) -> &[SchemaPtr] {
         match self {
             SchemaDef::Sequence(schema) => std::slice::from_ref(schema),
             SchemaDef::Tuple(fields) => fields,
-            // TODO: Struct and Enum generics
-            _ => &[],
+            SchemaDef::Struct(def) => match def.generic {
+                Some(generic) => generic.params,
+                None => &[],
+            },
+            SchemaDef::Enum(def) => match def.generic {
+                Some(generic) => generic.params,
+                None => &[],
+            },
+            SchemaDef::Primitive(_) | SchemaDef::GenericParameter(_) => &[],
         }
+    }
+
+    // FIXME: Instead of `generic` field, all schemas should contain `definition`
+    // field. Definition would be the same as `GenericDef`, but if a type is not
+    // generic, params would be an empty slice. This would simplify a lot and make
+    // things more consistent.
+    /// Returns the generic definition if this schema is generic.
+    pub fn generic_schema(&self) -> Option<SchemaDef> {
+        match self {
+            SchemaDef::Struct(def) => def.generic.map(|g| g.schema.get()),
+            SchemaDef::Enum(def) => def.generic.map(|g| g.schema.get()),
+            _ => None,
+        }
+    }
+}
+
+/// NOTE: We use this to prevent "infinitely sized structures" in [SchemaDef],
+/// since one [`SchemaDef`] can contain other [`SchemaDef`]. Treat this as a
+/// pointer to a schema definition.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct SchemaPtr(pub fn() -> SchemaDef);
+
+impl Debug for SchemaPtr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("SchemaPtr").field(&(self.0)()).finish()
+    }
+}
+
+impl SchemaPtr {
+    pub fn get(&self) -> SchemaDef {
+        (self.0)()
     }
 }
 
@@ -144,31 +181,31 @@ impl_schema_for_primitive!(
 
 impl<T: Schema> Schema for Vec<T> {
     fn schema() -> SchemaDef {
-        SchemaDef::Sequence(T::schema)
+        SchemaDef::Sequence(SchemaPtr(T::schema))
     }
 }
 
 impl<T: Schema> Schema for [T] {
     fn schema() -> SchemaDef {
-        SchemaDef::Sequence(T::schema)
+        SchemaDef::Sequence(SchemaPtr(T::schema))
     }
 }
 
 impl<T: Schema> Schema for &[T] {
     fn schema() -> SchemaDef {
-        SchemaDef::Sequence(T::schema)
+        SchemaDef::Sequence(SchemaPtr(T::schema))
     }
 }
 
 impl<T: Schema> Schema for &mut [T] {
     fn schema() -> SchemaDef {
-        SchemaDef::Sequence(T::schema)
+        SchemaDef::Sequence(SchemaPtr(T::schema))
     }
 }
 
 impl<const N: usize, T: Schema> Schema for [T; N] {
     fn schema() -> SchemaDef {
-        SchemaDef::Sequence(T::schema)
+        SchemaDef::Sequence(SchemaPtr(T::schema))
     }
 }
 
@@ -179,7 +216,7 @@ macro_rules! impl_schema_for_tuples {
         $(
             impl<$($name: Schema),+> Schema for ($($name,)+) {
                 fn schema() -> SchemaDef {
-                    SchemaDef::Tuple(&[$($name::schema),+])
+                    SchemaDef::Tuple(&[$(SchemaPtr($name::schema)),+])
                 }
             }
         )+
@@ -229,7 +266,7 @@ pub enum Shape {
     /// enum E { NewtypeVariant(i32) }
     /// enum E { NewtypeVariant((i32, String)) }
     /// ```
-    Newtype(SchemaFn),
+    Newtype(SchemaPtr),
     /// Represents a tuple-like struct or enum variant.
     ///
     /// Example:
@@ -240,7 +277,7 @@ pub enum Shape {
     /// enum E { TupleVariant() }
     /// enum E { TupleVariant(i32, String) }
     /// ```
-    Tuple(&'static [SchemaFn]),
+    Tuple(&'static [SchemaPtr]),
     /// Represents a struct or enum variant with named fields.
     ///
     /// Example:
@@ -258,17 +295,15 @@ impl Shape {
     fn visit_dependencies(&self, visit: &mut impl FnMut(SchemaDef)) {
         match *self {
             Shape::Unit => {}
-            Shape::Newtype(schema) => visit(schema()),
+            Shape::Newtype(schema) => visit(schema.get()),
             Shape::Tuple(fields) => {
-                for field in fields {
-                    let schema = (field)();
-                    visit(schema);
+                for schema in fields {
+                    visit(schema.get());
                 }
             }
             Shape::Map(fields) => {
                 for field in fields {
-                    let schema = (field.schema)();
-                    visit(schema);
+                    visit(field.schema.get());
                 }
             }
         }
@@ -282,12 +317,13 @@ pub struct StructDef {
     pub name: &'static str,
     pub module_path: &'static str,
     pub shape: Shape,
+    pub generic: Option<GenericDef>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FieldDef {
     pub name: &'static str,
-    pub schema: SchemaFn,
+    pub schema: SchemaPtr,
 }
 
 //// Enums
@@ -298,6 +334,7 @@ pub struct EnumDef {
     pub module_path: &'static str,
     pub representation: EnumRepr,
     pub variants: &'static [VariantDef],
+    pub generic: Option<GenericDef>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -313,4 +350,50 @@ pub enum EnumRepr {
         tag: &'static str,
         content: &'static str,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct GenericDef {
+    pub params: &'static [SchemaPtr],
+    pub schema: SchemaPtr,
+}
+
+//// Result
+
+impl<T: Schema, E: Schema> Schema for Result<T, E> {
+    fn schema() -> SchemaDef {
+        struct __T;
+        impl Schema for __T {
+            fn schema() -> SchemaDef {
+                SchemaDef::GenericParameter("T")
+            }
+        }
+
+        struct __E;
+        impl Schema for __E {
+            fn schema() -> SchemaDef {
+                SchemaDef::GenericParameter("E")
+            }
+        }
+
+        SchemaDef::Enum(EnumDef {
+            name: "Result",
+            module_path: "core::result",
+            representation: EnumRepr::External,
+            variants: &[
+                VariantDef {
+                    name: "Ok",
+                    shape: Shape::Newtype(SchemaPtr(T::schema)),
+                },
+                VariantDef {
+                    name: "Err",
+                    shape: Shape::Newtype(SchemaPtr(E::schema)),
+                },
+            ],
+            generic: Some(GenericDef {
+                params: &[SchemaPtr(T::schema), SchemaPtr(E::schema)],
+                schema: SchemaPtr(<Result<__T, __E>>::schema),
+            }),
+        })
+    }
 }

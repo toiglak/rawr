@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    EnumDef, EnumRepr, PrimitiveDef, Schema, SchemaDef, SchemaFn, Shape, StructDef, VariantDef,
+    EnumDef, EnumRepr, GenericDef, PrimitiveDef, Schema, SchemaDef, Shape, StructDef, VariantDef,
 };
 
 type StringCow = Cow<'static, str>;
@@ -17,7 +17,7 @@ pub struct Codegen {
     // which is important for the snapshot tests.
     //
     // In case the order of the generated bindings still changes (e.g., due to
-    // *probably* nondeterministic `SchemaFn` function pointer in `SchemaDef`),
+    // *probably* nondeterministic `SchemaPtr` function pointer in `SchemaDef`),
     // consider sorting beforehand by `name`, etc.
     schemas: BTreeSet<SchemaDef>,
 
@@ -64,36 +64,42 @@ impl Codegen {
         let _ = fs::remove_dir_all(&self.output_path);
 
         // Group schemas by module
-        let mut modules: HashMap<&'static str, Vec<SchemaDef>> = HashMap::new();
+        let mut modules: HashMap<&'static str, BTreeSet<SchemaDef>> = HashMap::new();
         for schema in &self.schemas {
             match schema {
-                SchemaDef::Primitive(..) | SchemaDef::Sequence(..) | SchemaDef::Tuple(..) => {}
+                SchemaDef::Primitive(..)
+                | SchemaDef::Sequence(..)
+                | SchemaDef::Tuple(..)
+                | SchemaDef::GenericParameter(..) => {}
                 SchemaDef::Struct(struct_def) => {
                     modules
                         .entry(struct_def.module_path)
-                        .or_insert_with(Vec::new)
-                        .push(schema.clone());
+                        .or_insert_with(BTreeSet::new)
+                        .insert(schema.generic_schema().unwrap_or(*schema));
                 }
                 SchemaDef::Enum(enum_def) => {
                     modules
                         .entry(enum_def.module_path)
-                        .or_insert_with(Vec::new)
-                        .push(schema.clone());
+                        .or_insert_with(BTreeSet::new)
+                        .insert(schema.generic_schema().unwrap_or(*schema));
                 }
             }
         }
 
-        for (module_path, schema_defs) in modules {
-            self.generate_module(module_path, &schema_defs);
+        for (module_path, definitions) in modules {
+            self.generate_module(
+                module_path,
+                &definitions.iter().cloned().collect::<Vec<_>>(),
+            );
         }
     }
 
-    fn generate_module(&self, module_path: &'static str, schema_defs: &[SchemaDef]) {
+    fn generate_module(&self, module_path: &'static str, definitions: &[SchemaDef]) {
         let module_dir = self.create_module_directory(module_path);
         let output_file_path = module_dir.join("index.ts");
 
-        let imports = self.generate_imports(module_path, schema_defs);
-        let defs = self.generate_definitions(schema_defs);
+        let imports = self.generate_imports(module_path, definitions);
+        let defs = self.generate_definitions(definitions);
 
         let file_content = format!("{}{}", imports, defs);
         fs::write(&output_file_path, file_content).expect("Failed to write module bindings");
@@ -108,18 +114,25 @@ impl Codegen {
     fn generate_imports(&self, module_path: &str, schema_defs: &[SchemaDef]) -> String {
         //// Create a list of all type dependencies that are not in this module
 
-        let mut dependencies = BTreeSet::new();
+        type Imports = BTreeSet<SchemaDef>;
 
-        fn visit(dependencies: &mut BTreeSet<SchemaDef>, def: SchemaDef, module_path: &&str) {
+        let mut dependencies: Imports = BTreeSet::new();
+
+        fn visit(dependencies: &mut Imports, def: SchemaDef, module_path: &&str) {
             // If the type contains other types as part of its definition, visit them
-            for dep_def in def.generic_dependencies() {
-                visit(dependencies, dep_def(), module_path);
+            for dep in def.generic_dependencies() {
+                visit(dependencies, dep.get(), module_path);
             }
 
             // If the type is not in the same module, add it as a dependency
             if let Some(schema_module) = def.module_path() {
                 if *module_path != schema_module {
-                    dependencies.insert(def);
+                    // If the type is generic, add the generic schema to avoid
+                    // duplicate imports (BTreeSet will filter out duplicates)
+                    match def.generic_schema() {
+                        Some(generic_def) => dependencies.insert(generic_def),
+                        None => dependencies.insert(def),
+                    };
                 }
             }
         }
@@ -176,22 +189,29 @@ impl Codegen {
     ///      b: Option<string>; // <- `Option<string>` is a type
     /// };
     /// ```
-    fn generate_type(&self, schema: &SchemaFn) -> StringCow {
-        match schema() {
+    fn generate_type(&self, schema: SchemaDef) -> StringCow {
+        match schema {
             SchemaDef::Primitive(ref prim) => self.primitive_to_type(prim).into(),
             SchemaDef::Sequence(ref schema) => {
-                let ty = self.generate_type(schema);
+                let ty = self.generate_type(schema.get());
                 format!("{}[]", ty).into()
             }
             SchemaDef::Tuple(ref schemas) => {
                 let ts_types: Vec<StringCow> = schemas
                     .iter()
-                    .map(|schema| self.generate_type(schema))
+                    .map(|schema| self.generate_type(schema.get()))
                     .collect();
                 format!("[{}]", ts_types.join(", ")).into()
             }
-            SchemaDef::Struct(ref struct_type) => struct_type.name.into(),
-            SchemaDef::Enum(enum_def) => enum_def.name.into(),
+            SchemaDef::Struct(ref struct_type) => {
+                let generics = self.generate_generic_params(&struct_type.generic);
+                format!("{}{}", struct_type.name, generics).into()
+            }
+            SchemaDef::Enum(enum_def) => {
+                let generics = self.generate_generic_params(&enum_def.generic);
+                format!("{}{}", enum_def.name, generics).into()
+            }
+            SchemaDef::GenericParameter(param) => param.into(),
         }
     }
 
@@ -214,30 +234,59 @@ impl Codegen {
         }
     }
 
+    fn generate_generic_params(&self, generic: &Option<GenericDef>) -> String {
+        if let Some(generic) = generic {
+            let mut param_names = Vec::new();
+
+            for param in generic.params {
+                param_names.push(self.generate_type(param.get()));
+            }
+
+            if !param_names.is_empty() {
+                format!("<{}>", param_names.join(", "))
+            } else {
+                "".to_string()
+            }
+        } else {
+            "".to_string()
+        }
+    }
+
     fn generate_struct_definition(&self, struct_def: &StructDef, buf: &mut String) {
+        let generics = self.generate_generic_params(&struct_def.generic);
         match struct_def.shape {
             Shape::Unit => {
-                buf.push_str(&format!("export type {} = null;\n", struct_def.name));
+                buf.push_str(&format!(
+                    "export type {}{} = null;\n",
+                    struct_def.name, generics
+                ));
             }
             Shape::Newtype(ref schema) => {
-                let ty = self.generate_type(schema);
-                buf.push_str(&format!("export type {} = {};\n", struct_def.name, ty));
+                let ty = self.generate_type(schema.get());
+                buf.push_str(&format!(
+                    "export type {}{} = {};\n",
+                    struct_def.name, generics, ty
+                ));
             }
             Shape::Tuple(ref fields) => {
                 let ts_types: Vec<StringCow> = fields
                     .iter()
-                    .map(|schema| self.generate_type(schema))
+                    .map(|schema| self.generate_type(schema.get()))
                     .collect();
                 buf.push_str(&format!(
-                    "export type {} = [{}];\n",
+                    "export type {}{} = [{}];\n",
                     struct_def.name,
+                    generics,
                     ts_types.join(", ")
                 ));
             }
             Shape::Map(ref fields) => {
-                buf.push_str(&format!("export type {} = {{\n", struct_def.name));
+                buf.push_str(&format!(
+                    "export type {}{} = {{\n",
+                    struct_def.name, generics
+                ));
                 for field in *fields {
-                    let ty = self.generate_type(&field.schema);
+                    let ty = self.generate_type(field.schema.get());
                     buf.push_str(&format!("  {}: {};\n", field.name, ty));
                 }
                 buf.push_str("};\n");
@@ -246,7 +295,8 @@ impl Codegen {
     }
 
     fn generate_enum_definition(&self, enum_def: &EnumDef, buf: &mut String) {
-        buf.push_str(&format!("export type {} =\n", enum_def.name));
+        let generics = self.generate_generic_params(&enum_def.generic);
+        buf.push_str(&format!("export type {}{} =\n", enum_def.name, generics));
         for variant in enum_def.variants {
             buf.push_str(&self.generate_enum_variant(&enum_def.representation, variant));
         }
@@ -262,7 +312,7 @@ impl Codegen {
                 }
             },
             Shape::Newtype(ref schema) => {
-                let ty = self.generate_type(schema);
+                let ty = self.generate_type(schema.get());
                 match repr {
                     EnumRepr::External => format!("  | {{ \"{}\": {} }}\n", variant.name, ty),
                     EnumRepr::Adjacent { tag, content } => {
@@ -276,7 +326,7 @@ impl Codegen {
             Shape::Tuple(ref fields) => {
                 let ts_types: Vec<StringCow> = fields
                     .iter()
-                    .map(|schema| self.generate_type(schema))
+                    .map(|schema| self.generate_type(schema.get()))
                     .collect();
                 match repr {
                     EnumRepr::External => {
@@ -301,7 +351,7 @@ impl Codegen {
                 let field_strs: Vec<String> = fields
                     .iter()
                     .map(|field| {
-                        let ty = self.generate_type(&field.schema);
+                        let ty = self.generate_type(field.schema.get());
                         format!("{}: {}", field.name, ty)
                     })
                     .collect();
