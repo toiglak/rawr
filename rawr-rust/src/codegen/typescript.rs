@@ -119,7 +119,8 @@ impl Codegen {
         let mut dependencies: Imports = BTreeSet::new();
 
         fn visit(dependencies: &mut Imports, def: SchemaDef, module_path: &&str) {
-            // If the type contains other types as part of its definition, visit them
+            // If the type depends on other types, for example `T` in `Option<T>`
+            // or `T` and `U` in the tuple `(T, U)`, add them as a dependency
             for dep in def.generic_dependencies() {
                 visit(dependencies, dep.get(), module_path);
             }
