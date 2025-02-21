@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     enumeration::TestEnums,
-    module::{nested_module::NestedModuleStruct, ImportedStruct},
+    module::{ImportedStruct, nested_module::NestedModuleStruct},
     result::ResultsTest,
     sequence::SequenceTypes,
 };

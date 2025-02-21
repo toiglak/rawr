@@ -1,5 +1,5 @@
 use quote::quote;
-use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, GenericParam, TypeParam};
+use syn::{Attribute, Data, DeriveInput, Fields, GenericParam, TypeParam, parse_macro_input};
 
 mod serde;
 

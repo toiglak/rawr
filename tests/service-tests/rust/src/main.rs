@@ -44,7 +44,7 @@ async fn main() {
 
     // Make 10 concurrent requests to the server.
     let client = &client;
-    let make_request = |i| async move {
+    let make_request = async move |i| {
         let response = client.say_hello(format!("World {}", i + 1)).await;
         println!("{}: {}", i + 1, response);
     };

@@ -106,24 +106,18 @@ async fn dispatch_server_responses<ResData>(
 pub struct AbstractServer;
 
 impl AbstractServer {
-    pub async fn new<Req, Res, H, F>(server_transport: ServerTransport<Req, Res>, handle_request: H)
-    where
-        // handle_request: impl AsyncFn(Request<Req>) -> Response<Res>
-        H: Fn(Req) -> F + Clone,
-        F: Future<Output = Res>,
-    {
+    pub async fn new<Req, Res>(
+        server_transport: ServerTransport<Req, Res>,
+        handle_request: impl AsyncFn(Req) -> Res,
+    ) {
         let (req_rx, res_tx) = server_transport;
-        let handle_request = |req: Request<Req>| {
-            let res_tx = res_tx.clone();
-            let handle_request = handle_request.clone();
-            async move {
-                let response = handle_request(req.data).await;
-                let resp = Response {
-                    id: req.id,
-                    data: response,
-                };
-                res_tx.send(resp);
-            }
+        let handle_request = async |req: Request<Req>| {
+            let response = handle_request(req.data).await;
+            let resp = Response {
+                id: req.id,
+                data: response,
+            };
+            res_tx.send(resp);
         };
         // TODO: Consider returning a stream, so that user can handle requests in
         // parallel if they want to.

@@ -1,6 +1,6 @@
 use futures::{
-    channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
     StreamExt,
+    channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
 };
 
 // TODO: Consider accepting any channel implementation implementing a trait.

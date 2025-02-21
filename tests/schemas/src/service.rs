@@ -130,25 +130,21 @@ impl TestServer {
         server_transport: ServerTransport<TestRequest, TestResponse>,
         service_handler: impl TestService,
     ) -> impl Future<Output = ()> {
-        let handle_request = move |req: TestRequest| {
-            let handler = service_handler.clone();
-            async move {
-                match req {
-                    TestRequest::say_hello((arg0,)) => {
-                        let data = handler.say_hello(arg0).await;
-                        TestResponse::say_hello(data)
-                    }
-                    TestRequest::complex((arg0, arg1)) => {
-                        let data = handler.complex(arg0, arg1).await;
-                        TestResponse::complex(data)
-                    }
-                    TestRequest::ping_enum((arg0,)) => {
-                        let data = handler.ping_enum(arg0).await;
-                        TestResponse::ping_enum(data)
-                    }
-                }
+        let handle_request = async move |req: TestRequest| match req {
+            TestRequest::say_hello((arg0,)) => {
+                let data = service_handler.say_hello(arg0).await;
+                TestResponse::say_hello(data)
+            }
+            TestRequest::complex((arg0, arg1)) => {
+                let data = service_handler.complex(arg0, arg1).await;
+                TestResponse::complex(data)
+            }
+            TestRequest::ping_enum((arg0,)) => {
+                let data = service_handler.ping_enum(arg0).await;
+                TestResponse::ping_enum(data)
             }
         };
+
         AbstractServer::new(server_transport, handle_request)
     }
 }

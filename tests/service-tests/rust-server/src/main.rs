@@ -1,12 +1,12 @@
-use futures::{future, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt, future};
 use schemas::enumeration::EnumAdjacentlyTagged;
 use schemas::service::{TestRequest, TestServer, TestService};
 use schemas::structure::Structure;
 use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
+use tokio_tungstenite::tungstenite::Error;
 use tokio_tungstenite::tungstenite::error::ProtocolError;
 use tokio_tungstenite::tungstenite::protocol::Message;
-use tokio_tungstenite::tungstenite::Error;
 
 #[derive(Clone)]
 struct ServiceImpl {}

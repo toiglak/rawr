@@ -1,4 +1,4 @@
-use syn::{parse::Parse, Attribute};
+use syn::{Attribute, parse::Parse};
 
 pub fn parse_attr(attrs: &[Attribute]) -> Option<(String, String)> {
     for attr in attrs {

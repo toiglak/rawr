@@ -1,4 +1,4 @@
-use futures::{future, stream, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt, future, stream};
 use schemas::{
     enumeration::EnumAdjacentlyTagged,
     module::ImportedStruct,
@@ -7,7 +7,7 @@ use schemas::{
 };
 use tokio_tungstenite::{
     connect_async,
-    tungstenite::{error::ProtocolError, protocol::Message, Error},
+    tungstenite::{Error, error::ProtocolError, protocol::Message},
 };
 
 #[tokio::main]
@@ -55,7 +55,7 @@ async fn main() {
 
     // Make 10 concurrent requests to the server.
     let client = &client;
-    let make_request = |i| async move {
+    let make_request = async |i| {
         let response = client.say_hello(format!("World {}", i + 1)).await;
         assert_eq!(response, format!("Hello, World {}!", i + 1));
     };
