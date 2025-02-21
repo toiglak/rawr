@@ -1,10 +1,10 @@
 use std::{
     future::Future,
-    sync::atomic::{AtomicU32, Ordering},
     sync::Arc,
+    sync::atomic::{AtomicU32, Ordering},
 };
 
-use futures::{channel::oneshot, StreamExt};
+use futures::{StreamExt, channel::oneshot};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

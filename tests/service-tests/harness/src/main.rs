@@ -4,7 +4,7 @@ use tokio::process::Command;
 use tokio::runtime;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    std::env::set_var("RUST_LOG", "info");
+    unsafe { std::env::set_var("RUST_LOG", "info") };
     env_logger::init();
 
     //// Propagate panics from the runtime

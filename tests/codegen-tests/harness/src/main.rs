@@ -3,7 +3,7 @@ use std::process::Command;
 mod diff;
 
 fn main() {
-    std::env::set_var("RUST_LOG", "info");
+    unsafe { std::env::set_var("RUST_LOG", "info") };
     env_logger::builder().init();
 
     let snapshots_path = &format!("{}/../snapshots", env!("CARGO_MANIFEST_DIR"));

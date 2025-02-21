@@ -28,7 +28,7 @@ impl TestService for ServiceImpl {
 
 #[tokio::main]
 async fn main() {
-    std::env::set_var("RUST_LOG", "debug");
+    unsafe { std::env::set_var("RUST_LOG", "debug") };
     env_logger::init();
 
     let addr = std::env::var("SERVER_ADDR").expect("SERVER_ADDR not set");
