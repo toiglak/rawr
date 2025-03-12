@@ -397,3 +397,11 @@ impl<T: Schema, E: Schema> Schema for Result<T, E> {
         })
     }
 }
+
+//// PathBuf
+
+impl Schema for std::path::PathBuf {
+    fn schema() -> SchemaDef {
+        SchemaDef::Primitive(PrimitiveDef::String)
+    }
+}
