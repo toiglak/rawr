@@ -1,9 +1,9 @@
+use std::ops::{Deref, DerefMut};
+
 use futures::{
     StreamExt,
     channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
 };
-
-// TODO: Consider accepting any channel implementation implementing a trait.
 
 pub fn transport<Req, Res>() -> ((Tx<Req>, Rx<Res>), (Rx<Req>, Tx<Res>)) {
     let (req_tx, req_rx) = mpsc::unbounded();
@@ -25,6 +25,20 @@ impl<T> Clone for Tx<T> {
     }
 }
 
+impl<T> Deref for Tx<T> {
+    type Target = UnboundedSender<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> DerefMut for Tx<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 pub struct Rx<T>(pub UnboundedReceiver<T>);
 
 impl<T> Rx<T> {
@@ -34,5 +48,19 @@ impl<T> Rx<T> {
 
     pub async fn recv(&mut self) -> Option<T> {
         self.0.next().await
+    }
+}
+
+impl<T> Deref for Rx<T> {
+    type Target = UnboundedReceiver<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> DerefMut for Rx<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

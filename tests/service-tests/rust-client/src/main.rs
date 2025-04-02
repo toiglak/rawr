@@ -27,7 +27,7 @@ async fn main() {
         let ws = connect_async(&format!("ws://{}", addr)).await.unwrap().0;
 
         let (mut socket_tx, mut socket_rx) = ws.split();
-        let (mut server_rx, server_tx) = server_transport;
+        let (mut client_rx, client_tx) = server_transport;
 
         let handle_incoming = async {
             while let Some(msg) = socket_rx.next().await {
@@ -39,12 +39,12 @@ async fn main() {
                 };
                 let msg: rawr::Response<TestResponse> =
                     serde_json::from_str(&msg.to_string()).unwrap();
-                server_tx.send(msg);
+                client_tx.send(msg);
             }
         };
 
         let handle_outgoing = async {
-            while let Some(req) = server_rx.recv().await {
+            while let Some(req) = client_rx.recv().await {
                 let req = Message::text(serde_json::to_string(&req).unwrap());
                 socket_tx.send(req).await.unwrap();
             }

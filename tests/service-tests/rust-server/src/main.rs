@@ -42,7 +42,7 @@ async fn main() {
         let ws_stream = accept_async(stream).await.expect("Failed to accept");
         let (mut write, mut read) = ws_stream.split();
         // TODO: You should probably multiplex here, handle multiple clients concurrently.
-        let (req_tx, res_rx) = &mut client_transport;
+        let (server_tx, server_rx) = &mut client_transport;
 
         let handle_incoming = Box::pin(async {
             while let Some(msg) = read.next().await {
@@ -55,12 +55,12 @@ async fn main() {
                 log::debug!("Received message: {}", msg);
                 let msg: rawr::Request<TestRequest> =
                     serde_json::from_str(&msg.to_string()).unwrap();
-                req_tx.send(msg);
+                server_tx.send(msg);
             }
         });
 
         let handle_outgoing = Box::pin(async {
-            while let Some(res) = res_rx.recv().await {
+            while let Some(res) = server_rx.recv().await {
                 let res = Message::text(serde_json::to_string(&res).unwrap());
                 log::debug!("Sending message: {}", res);
                 write.send(res).await.unwrap();
