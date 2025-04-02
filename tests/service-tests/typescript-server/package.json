@@ -6,6 +6,9 @@
   "scripts": {
     "test": "bun src/index.ts"
   },
+  "dependencies": {
+    "rawr": "workspace:*"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

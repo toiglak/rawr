@@ -5,7 +5,7 @@ import {
   type TestRequest,
   type TestResponse,
 } from "../../generated";
-import type { RawrRequest, RawrResponse } from "rawr";
+import type { Packet } from "rawr";
 import type { Structure } from "../../typescript-bindings/schemas/structure";
 import type { EnumAdjacentlyTagged } from "../../typescript-bindings/schemas/enumeration";
 
@@ -36,19 +36,19 @@ const TEST_STRUCTURE: Structure = {
 
 async function checkServer(url: string) {
   const ws = new WebSocket(url);
-  const resMap = new Map<number, (res: RawrResponse<TestResponse>) => void>();
+  const resMap = new Map<number, (res: Packet<TestResponse>) => void>();
 
   // ws.on("error", reject);
   ws.on("message", (data) => {
-    const response: RawrResponse<TestResponse> = JSON.parse(data.toString());
+    const response: Packet<TestResponse> = JSON.parse(data.toString());
     const resolve = resMap.get(response.id);
     if (resolve) resMap.delete(response.id);
     if (resolve) resolve(response);
   });
 
   async function handle_request(
-    request: RawrRequest<TestRequest>
-  ): Promise<RawrResponse<TestResponse>> {
+    request: Packet<TestRequest>
+  ): Promise<Packet<TestResponse>> {
     return new Promise((resolve) => {
       resMap.set(request.id, resolve);
       ws.send(JSON.stringify(request));

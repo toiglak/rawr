@@ -53,7 +53,7 @@ async fn main() {
                     Err(e) => panic!("{:?}", e),
                 };
                 log::debug!("Received message: {}", msg);
-                let msg: rawr::Request<TestRequest> =
+                let msg: rawr::Packet<TestRequest> =
                     serde_json::from_str(&msg.to_string()).unwrap();
                 server_tx.send(msg);
             }

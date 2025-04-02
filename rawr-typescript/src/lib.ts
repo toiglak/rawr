@@ -1,15 +1,10 @@
 type ReqId = number;
 
-export interface RawrRequest<Req> {
+export interface Packet<T> {
   id: ReqId;
-  data: Req;
-}
-
-export interface RawrResponse<Res> {
-  id: ReqId;
-  data: Res;
+  data: T;
 }
 
 export type HandleRequest<Req, Res> = (
-  data: RawrRequest<Req>
-) => Promise<RawrResponse<Res>>;
+  req: Packet<Req>
+) => Promise<Packet<Res>>;

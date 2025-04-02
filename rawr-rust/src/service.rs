@@ -15,8 +15,8 @@ pub mod channel;
 pub use channel::*;
 
 pub type Result<T> = std::result::Result<T, TransportError>;
-pub type ClientTransport<Req, Res> = (Tx<Request<Req>>, Rx<Response<Res>>);
-pub type ServerTransport<Req, Res> = (Rx<Request<Req>>, Tx<Response<Res>>);
+pub type ClientTransport<Req, Res> = (Tx<Packet<Req>>, Rx<Packet<Res>>);
+pub type ServerTransport<Req, Res> = (Rx<Packet<Req>>, Tx<Packet<Res>>);
 
 #[derive(Debug, Clone, Error)]
 pub enum TransportError {
@@ -29,27 +29,20 @@ pub enum TransportError {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Request<P> {
-    /// Unique identifier used to send the response back to the correct caller
+pub struct Packet<P> {
+    /// Unique identifier used to send the response back to the correct caller,
     /// when multiple calls to the same method were made.
     pub id: u32,
-    /// Request payload. It consists of the arguments of the rpc call.
-    pub data: P,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Response<P> {
-    /// Unique identifier used to send the response back to the correct caller
-    /// when multiple calls to the same method were made.
-    pub id: u32,
-    /// Request payload. It consists of the return value of the rpc call.
+    /// Request/response payload. It consists of the arguments of the rpc call when
+    /// packet is a request and the return value of the rpc call when packet is a
+    /// response.
     pub data: P,
 }
 
 pub struct AbstractClient<Req, Res> {
     counter: Arc<AtomicU32>,
-    requests: Arc<DashMap<u32, oneshot::Sender<Response<Res>>>>,
-    server_tx: Tx<Request<Req>>,
+    requests: Arc<DashMap<u32, oneshot::Sender<Packet<Res>>>>,
+    server_tx: Tx<Packet<Req>>,
 }
 
 impl<Req, Res> AbstractClient<Req, Res> {
@@ -72,7 +65,7 @@ impl<Req, Res> AbstractClient<Req, Res> {
         let id = self.counter.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = oneshot::channel();
         self.requests.insert(id, tx);
-        self.server_tx.send(Request { id, data });
+        self.server_tx.send(Packet { id, data });
 
         //// Wait for the response.
         let res = rx.await.expect("Failed to receive response");
@@ -91,8 +84,8 @@ impl<Req, Res> Clone for AbstractClient<Req, Res> {
 }
 
 async fn dispatch_server_responses<ResData>(
-    mut server_rx: Rx<Response<ResData>>,
-    requests: Arc<DashMap<u32, oneshot::Sender<Response<ResData>>>>,
+    mut server_rx: Rx<Packet<ResData>>,
+    requests: Arc<DashMap<u32, oneshot::Sender<Packet<ResData>>>>,
 ) {
     while let Some(res) = server_rx.recv().await {
         if let Some((_, sender)) = requests.remove(&res.id) {
@@ -111,9 +104,9 @@ impl AbstractServer {
         handle_request: impl AsyncFn(Req) -> Res,
     ) {
         let (client_rx, client_tx) = server_transport;
-        let handle_request = async |req: Request<Req>| {
+        let handle_request = async |req: Packet<Req>| {
             let data = handle_request(req.data).await;
-            let res = Response { id: req.id, data };
+            let res = Packet { id: req.id, data };
             client_tx.send(res);
         };
         // TODO: Consider returning a stream, so that user can handle requests in

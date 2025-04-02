@@ -1,4 +1,4 @@
-import type { RawrRequest, RawrResponse } from "rawr";
+import type { Packet } from "rawr";
 import {
   TestServer,
   type TestRequest,
@@ -30,8 +30,8 @@ Bun.serve({
   },
   websocket: {
     async message(ws, message) {
-      const req: RawrRequest<TestRequest> = JSON.parse(message as any);
-      const res: RawrResponse<TestResponse> = await handle_request(req);
+      const req: Packet<TestRequest> = JSON.parse(message as any);
+      const res: Packet<TestResponse> = await handle_request(req);
       ws.send(JSON.stringify(res));
     },
     open(ws) {

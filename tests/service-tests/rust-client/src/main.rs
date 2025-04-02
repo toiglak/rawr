@@ -37,7 +37,7 @@ async fn main() {
                     Ok(msg) => msg,
                     Err(e) => panic!("{:?}", e),
                 };
-                let msg: rawr::Response<TestResponse> =
+                let msg: rawr::Packet<TestResponse> =
                     serde_json::from_str(&msg.to_string()).unwrap();
                 client_tx.send(msg);
             }
