@@ -1,4 +1,4 @@
-use rawr::{AbstractClient, AbstractServer, ClientTransport, ServerTransport};
+use rawr::{AbstractClient, AbstractServer, ClientTransport, Result, ServerTransport};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
@@ -38,69 +38,40 @@ pub struct TestClient {
 }
 
 impl TestClient {
-    /// Create a new client. Returns a future that must be spawned on a runtime for
-    /// the client to start processing requests and responses.
-    ///
-    /// ## Example
-    ///
-    /// ```rust
-    /// let (client_transport, server_transport) = rawr::transport();
-    ///
-    /// let server_task = TestServer::new(server_transport, ServiceImpl);
-    /// let (mut client, client_task) = TestClient::new(client_transport);
-    ///
-    /// // Run tasks.
-    /// tokio::spawn(client_task);
-    /// tokio::spawn(server_task);
-    ///
-    /// let response = client.say_hello("World".to_string()).await;
-    /// println!("{}", response);
-    /// ```
+    /// Create a new client.
     pub fn new(
         transport: ClientTransport<TestRequest, TestResponse>,
     ) -> (Self, impl Future<Output = ()>) {
-        let (inner, client_task) = AbstractClient::new(transport);
-        (Self { inner }, client_task)
+        let (inner, task) = AbstractClient::new(transport);
+        (Self { inner }, task)
     }
 }
 
-impl TestService for TestClient {
-    async fn say_hello(&self, arg: String) -> String {
+impl TestClient {
+    pub async fn say_hello(&self, arg: String) -> Result<String> {
         let req = TestRequest::say_hello((arg,));
-        let res = self.inner.make_request(req).await;
-
-        #[allow(irrefutable_let_patterns)]
-        if let TestResponse::say_hello(ret) = res {
-            ret
-        } else {
-            // Perhaps this should return an error instead of panicking?
-            panic!("Unexpected response")
+        match self.inner.make_request(req).await {
+            Ok(TestResponse::say_hello(ret)) => Ok(ret),
+            Ok(_) => panic!("Unexpected response"),
+            Err(e) => Err(e),
         }
     }
 
-    async fn complex(&self, arg0: Structure, arg1: i32) -> Structure {
+    pub async fn complex(&self, arg0: Structure, arg1: i32) -> Result<Structure> {
         let req = TestRequest::complex((arg0, arg1));
-        let res = self.inner.make_request(req).await;
-
-        #[allow(irrefutable_let_patterns)]
-        if let TestResponse::complex(ret) = res {
-            ret
-        } else {
-            // Perhaps this should return an error instead of panicking?
-            panic!("Unexpected response")
+        match self.inner.make_request(req).await {
+            Ok(TestResponse::complex(ret)) => Ok(ret),
+            Ok(_) => panic!("Unexpected response"),
+            Err(e) => Err(e),
         }
     }
 
-    async fn ping_enum(&self, arg: EnumAdjacentlyTagged) -> EnumAdjacentlyTagged {
+    pub async fn ping_enum(&self, arg: EnumAdjacentlyTagged) -> Result<EnumAdjacentlyTagged> {
         let req = TestRequest::ping_enum((arg,));
-        let res = self.inner.make_request(req).await;
-
-        #[allow(irrefutable_let_patterns)]
-        if let TestResponse::ping_enum(ret) = res {
-            ret
-        } else {
-            // Perhaps this should return an error instead of panicking?
-            panic!("Unexpected response")
+        match self.inner.make_request(req).await {
+            Ok(TestResponse::ping_enum(ret)) => Ok(ret),
+            Ok(_) => panic!("Unexpected response"),
+            Err(e) => Err(e),
         }
     }
 }
@@ -132,16 +103,16 @@ impl TestServer {
     ) -> impl Future<Output = ()> {
         let handle_request = async move |req: TestRequest| match req {
             TestRequest::say_hello((arg0,)) => {
-                let data = service_handler.say_hello(arg0).await;
-                TestResponse::say_hello(data)
+                let res = service_handler.say_hello(arg0).await;
+                Ok(TestResponse::say_hello(res))
             }
             TestRequest::complex((arg0, arg1)) => {
-                let data = service_handler.complex(arg0, arg1).await;
-                TestResponse::complex(data)
+                let res = service_handler.complex(arg0, arg1).await;
+                Ok(TestResponse::complex(res))
             }
             TestRequest::ping_enum((arg0,)) => {
-                let data = service_handler.ping_enum(arg0).await;
-                TestResponse::ping_enum(data)
+                let res = service_handler.ping_enum(arg0).await;
+                Ok(TestResponse::ping_enum(res))
             }
         };
 

@@ -7,7 +7,7 @@
     "test": "bun src/index.ts"
   },
   "dependencies": {
-    "rawr": "workspace:*"
+    "rawr-json": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest"

@@ -2,7 +2,7 @@ use futures::{SinkExt, StreamExt, future, stream};
 use schemas::{
     enumeration::EnumAdjacentlyTagged,
     module::ImportedStruct,
-    service::{TestClient, TestResponse, TestService},
+    service::{TestClient, TestResponse},
     structure::Structure,
 };
 use tokio_tungstenite::{
@@ -16,10 +16,10 @@ async fn main() {
 
     let (client_transport, server_transport) = rawr::transport();
 
-    // Create server and client.
+    // Create client.
     let (client, client_task) = TestClient::new(client_transport);
 
-    // Run client task.
+    // Spawn the client task.
     tokio::spawn(client_task);
 
     // Handle communication with the server.
@@ -37,7 +37,7 @@ async fn main() {
                     Ok(msg) => msg,
                     Err(e) => panic!("{:?}", e),
                 };
-                let msg: rawr::Packet<TestResponse> =
+                let msg: rawr::Packet<rawr::Result<TestResponse>> =
                     serde_json::from_str(&msg.to_string()).unwrap();
                 client_tx.send(msg);
             }
@@ -56,7 +56,7 @@ async fn main() {
     // Make 10 concurrent requests to the server.
     let client = &client;
     let make_request = async |i| {
-        let response = client.say_hello(format!("World {}", i + 1)).await;
+        let response = client.say_hello(format!("World {}", i + 1)).await.unwrap();
         assert_eq!(response, format!("Hello, World {}!", i + 1));
     };
     stream::iter(0..10)
@@ -64,31 +64,31 @@ async fn main() {
         .await;
 
     // Test complex method.
-    let res = client.complex(Structure::default(), 42).await;
+    let res = client.complex(Structure::default(), 42).await.unwrap();
     assert_eq!(res.count, 42);
 
     //// Test sending enum back and forth.
 
     let en = EnumAdjacentlyTagged::VariantA;
-    let res = client.ping_enum(en.clone()).await;
+    let res = client.ping_enum(en.clone()).await.unwrap();
     assert_eq!(res, en);
 
     let en = EnumAdjacentlyTagged::VariantB();
-    let res = client.ping_enum(en.clone()).await;
+    let res = client.ping_enum(en.clone()).await.unwrap();
     assert_eq!(res, en);
 
     let en = EnumAdjacentlyTagged::VariantC(42);
-    let res = client.ping_enum(en.clone()).await;
+    let res = client.ping_enum(en.clone()).await.unwrap();
     assert_eq!(res, en);
 
     let en = EnumAdjacentlyTagged::VariantD(());
-    let res = client.ping_enum(en.clone()).await;
+    let res = client.ping_enum(en.clone()).await.unwrap();
     assert_eq!(res, en);
 
     let en = EnumAdjacentlyTagged::VariantE(ImportedStruct {
         value: "string".to_string(),
     });
-    let res = client.ping_enum(en.clone()).await;
+    let res = client.ping_enum(en.clone()).await.unwrap();
     assert_eq!(res, en);
 
     let en = EnumAdjacentlyTagged::VariantF((
@@ -97,7 +97,7 @@ async fn main() {
             value: "string".to_string(),
         },
     ));
-    let res = client.ping_enum(en.clone()).await;
+    let res = client.ping_enum(en.clone()).await.unwrap();
     assert_eq!(res, en);
 
     let en = EnumAdjacentlyTagged::VariantG(
@@ -106,11 +106,11 @@ async fn main() {
             value: "string".to_string(),
         },
     );
-    let res = client.ping_enum(en.clone()).await;
+    let res = client.ping_enum(en.clone()).await.unwrap();
     assert_eq!(res, en);
 
     let en = EnumAdjacentlyTagged::VariantH {};
-    let res = client.ping_enum(en.clone()).await;
+    let res = client.ping_enum(en.clone()).await.unwrap();
     assert_eq!(res, en);
 
     let en = EnumAdjacentlyTagged::VariantI {
@@ -119,6 +119,6 @@ async fn main() {
             value: "string".to_string(),
         },
     };
-    let res = client.ping_enum(en.clone()).await;
+    let res = client.ping_enum(en.clone()).await.unwrap();
     assert_eq!(res, en);
 }

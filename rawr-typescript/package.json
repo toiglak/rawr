@@ -1,5 +1,5 @@
 {
-  "name": "rawr",
+  "name": "rawr-json",
   "type": "module",
   "main": "src/lib.ts",
   "module": "src/lib.ts",

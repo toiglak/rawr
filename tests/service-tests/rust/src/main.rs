@@ -45,7 +45,7 @@ async fn main() {
     // Make 10 concurrent requests to the server.
     let client = &client;
     let make_request = async move |i| {
-        let response = client.say_hello(format!("World {}", i + 1)).await;
+        let response = client.say_hello(format!("World {}", i + 1)).await.unwrap();
         println!("{}: {}", i + 1, response);
     };
     let make_requests = stream::iter(0..10).for_each_concurrent(None, make_request);
@@ -56,5 +56,5 @@ async fn main() {
         panic!("test took more than 1 second to complete");
     }
 
-    client.complex(Structure::default(), 42).await;
+    client.complex(Structure::default(), 42).await.unwrap();
 }

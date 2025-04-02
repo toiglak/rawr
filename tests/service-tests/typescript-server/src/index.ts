@@ -1,23 +1,23 @@
-import type { Packet } from "rawr";
+import type { Packet, Result } from "rawr-json";
 import {
   TestServer,
   type TestRequest,
   type TestResponse,
-} from "../../generated";
+} from "../../manual-codegen";
 import type { Structure } from "../../typescript-bindings/schemas/structure";
 
 const addr = process.env.SERVER_ADDR;
 const port = addr && parseInt(addr.split(":")[1]);
 
-const handle_request = TestServer({
-  say_hello: function (arg) {
+const handleRequest = TestServer({
+  say_hello(arg) {
     return `Hello, ${arg}!`;
   },
-  complex: function (arg: Structure, n: number) {
+  complex(arg: Structure, n: number) {
     arg.count += n;
     return arg;
   },
-  ping_enum: function (arg) {
+  ping_enum(arg) {
     return arg;
   },
 });
@@ -31,7 +31,7 @@ Bun.serve({
   websocket: {
     async message(ws, message) {
       const req: Packet<TestRequest> = JSON.parse(message as any);
-      const res: Packet<TestResponse> = await handle_request(req);
+      const res: Packet<Result<TestResponse>> = await handleRequest(req);
       ws.send(JSON.stringify(res));
     },
     open(ws) {

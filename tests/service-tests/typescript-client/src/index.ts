@@ -4,8 +4,9 @@ import {
   TestClient,
   type TestRequest,
   type TestResponse,
-} from "../../generated";
-import type { Packet } from "rawr";
+} from "../../manual-codegen";
+import { RpcClient } from "rawr-json";
+import type { Packet, Result } from "rawr-json";
 import type { Structure } from "../../typescript-bindings/schemas/structure";
 import type { EnumAdjacentlyTagged } from "../../typescript-bindings/schemas/enumeration";
 
@@ -36,49 +37,51 @@ const TEST_STRUCTURE: Structure = {
 
 async function checkServer(url: string) {
   const ws = new WebSocket(url);
-  const resMap = new Map<number, (res: Packet<TestResponse>) => void>();
 
-  // ws.on("error", reject);
-  ws.on("message", (data) => {
-    const response: Packet<TestResponse> = JSON.parse(data.toString());
-    const resolve = resMap.get(response.id);
-    if (resolve) resMap.delete(response.id);
-    if (resolve) resolve(response);
+  const rpc = new RpcClient<TestRequest, TestResponse>((packet) => {
+    ws.send(JSON.stringify(packet));
   });
 
-  async function handle_request(
-    request: Packet<TestRequest>
-  ): Promise<Packet<TestResponse>> {
-    return new Promise((resolve) => {
-      resMap.set(request.id, resolve);
-      ws.send(JSON.stringify(request));
-    });
-  }
+  ws.on("message", (data) => {
+    const response: Packet<Result<TestResponse>> = JSON.parse(data.toString());
+    rpc.handleResponse(response);
+  });
+
+  ws.on("close", () => {
+    rpc.cancelAllPending(new Error("WebSocket closed"));
+  });
+
+  ws.on("error", (err) => {
+    rpc.cancelAllPending(err);
+  });
 
   // Wait until we're connected to the server.
   await new Promise((resolve) => ws.on("open", resolve));
 
   //// Test the service.
+  const client = TestClient(rpc);
 
-  const client = TestClient(handle_request);
-
-  // TODO: Test async ordering (req number should match res number).
+  // Test async ordering (req number should match res number).
   for (let i = 0; i < 10; i++) {
-    // client.say_hello("World " + i).then((res) => {
-    //   console.log(`[${i++}] ${res}`);
-    // });
-    const res = await client.say_hello("World " + i);
-    console.log(`[${i++}] ${res}`);
+    try {
+      const res = await client.say_hello("World " + i);
+      console.log(`[${i}] ${res}`);
+    } catch (err) {
+      console.error(`Error in say_hello for request ${i}:`, err);
+    }
   }
 
   // Test complex method.
-
-  const res = await client.complex(TEST_STRUCTURE, 42);
-  const expected = { ...TEST_STRUCTURE, count: 42 };
-  assert_eq(res, expected);
+  try {
+    const res = await client.complex(TEST_STRUCTURE, 42);
+    const expected = { ...TEST_STRUCTURE, count: 42 };
+    assert_eq(res, expected);
+  } catch (err) {
+    console.error("Error in complex method:", err);
+  }
 
   // Test sending enum back and forth.
-  {
+  try {
     let en: EnumAdjacentlyTagged = { type: "VariantA" };
     let res = await client.ping_enum(en);
     assert_eq(res, en);
@@ -114,6 +117,8 @@ async function checkServer(url: string) {
     en = { type: "VariantI", data: { a: 42, b: { value: "string" } } };
     res = await client.ping_enum(en);
     assert_eq(res, en);
+  } catch (err) {
+    console.error("Error in ping_enum method:", err);
   }
 
   ws.close();
@@ -122,7 +127,6 @@ async function checkServer(url: string) {
 checkServer(url);
 
 //// UTILITIES
-
 function assert_eq(expected: any, got: any) {
   if (!deepEquals(expected, got, true)) {
     console.error({
