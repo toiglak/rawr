@@ -4,7 +4,6 @@ import {
   type TestRequest,
   type TestResponse,
 } from "../../manual-codegen";
-import type { Structure } from "../../typescript-bindings/schemas/structure";
 
 const addr = process.env.SERVER_ADDR;
 const port = addr && parseInt(addr.split(":")[1]);
@@ -13,7 +12,7 @@ const handleRequest = TestServer({
   say_hello(arg) {
     return `Hello, ${arg}!`;
   },
-  complex(arg: Structure, n: number) {
+  complex(arg, n) {
     arg.count += n;
     return arg;
   },

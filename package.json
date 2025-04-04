@@ -8,9 +8,12 @@
     "tests/service-tests/typescript-server"
   ],
   "scripts": {
-    "dev": "mprocs"
+    "dev": "mprocs",
+    "test": "hereby"
   },
   "devDependencies": {
+    "execa": "^9.5.2",
+    "hereby": "^1.10.0",
     "mprocs": "0.7.1"
   }
 }

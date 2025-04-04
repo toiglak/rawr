@@ -3,7 +3,7 @@ resolver = "2"
 members = [
     "rawr-rust",
     "tests/codegen-tests/harness",
-    "tests/service-tests/harness",
+    "tests/service-tests/run_codegen",
     "tests/service-tests/rust",
     "tests/service-tests/rust-client",
     "tests/service-tests/rust-server",
